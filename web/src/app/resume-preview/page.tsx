@@ -1,15 +1,20 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { Suspense, useEffect, useRef, useState } from "react";
+import { useSearchParams } from "next/navigation";
 import FirebaseNotice from "@/components/FirebaseNotice";
 import EssayQuestionBlock from "@/components/EssayQuestionBlock";
 import DocxLivePreview from "@/components/DocxLivePreview";
+import UploadProgressModal from "@/components/UploadProgressModal";
+import ParsingLoadingScreen from "@/components/ParsingLoadingScreen";
+import WizardHeader from "@/components/WizardHeader";
 import { isFirebaseConfigured } from "@/lib/firebase";
 import {
   addCoverLetterAnswer,
   addExperience,
   createResumeDraft,
   getLatestResumeDraft,
+  getResumeDraft,
   saveProfile,
   updateResumeDraft,
 } from "@/lib/firestore";
@@ -39,6 +44,15 @@ const PROFILE_FIELDS: { key: keyof Profile; label: string }[] = [
 ];
 
 export default function ResumePreviewPage() {
+  return (
+    <Suspense fallback={null}>
+      <ResumePreviewInner />
+    </Suspense>
+  );
+}
+
+function ResumePreviewInner() {
+  const searchParams = useSearchParams();
   const [started, setStarted] = useState(false);
   const [uploadingForm, setUploadingForm] = useState(false);
   const [formName, setFormName] = useState<string | null>(null);
@@ -75,12 +89,31 @@ export default function ResumePreviewPage() {
   const [saving, setSaving] = useState(false);
   const [savedAt, setSavedAt] = useState<number | null>(null);
   const [downloading, setDownloading] = useState(false);
+  const [formDragOver, setFormDragOver] = useState(false);
+  const [showLoadedToast, setShowLoadedToast] = useState(false);
+  const [uploadModal, setUploadModal] = useState<{
+    fileName: string;
+    fileSizeBytes: number;
+    progress: number;
+  } | null>(null);
+  const uploadCancelledRef = useRef(false);
 
   useEffect(() => {
     if (!isFirebaseConfigured) return;
+    const draftIdParam = searchParams.get("draft");
+    if (draftIdParam) {
+      // 나의 이력서(/my-resumes) 목록에서 특정 초안을 골라 들어온 경우 — 그 초안을 바로 이어서 연다.
+      getResumeDraft(draftIdParam).then((draft) => {
+        if (!draft) return;
+        setDraftId(draft.id);
+        startWithForm(draft.formFileUrl, draft.formFileName, draft.fieldValues);
+      });
+      return;
+    }
     getLatestResumeDraft()
       .then(setExistingDraft)
       .catch(() => {});
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   async function analyzeAndRender(url: string, name: string, overrideValues?: Record<string, string>) {
@@ -106,6 +139,9 @@ export default function ResumePreviewPage() {
       for (const f of analyzed) initialValues[f.id] = f.value;
       const merged = { ...initialValues, ...overrideValues };
       setFieldValues(merged);
+
+      setShowLoadedToast(true);
+      setTimeout(() => setShowLoadedToast(false), 4000);
 
       await renderPreview(url, merged, analyzed);
     } catch (e) {
@@ -170,20 +206,46 @@ export default function ResumePreviewPage() {
     }
   }
 
-  async function handleFormUpload(e: React.ChangeEvent<HTMLInputElement>) {
-    const file = e.target.files?.[0];
-    if (!file) return;
+  async function uploadFormFile(file: File) {
+    uploadCancelledRef.current = false;
     setUploadingForm(true);
     setError(null);
+    setUploadModal({ fileName: file.name, fileSizeBytes: file.size, progress: 0 });
     try {
-      const url = isFirebaseConfigured ? await uploadDocumentFile(file) : URL.createObjectURL(file);
+      const url = isFirebaseConfigured
+        ? await uploadDocumentFile(file, (percent) => {
+            setUploadModal((m) => (m ? { ...m, progress: percent } : m));
+          })
+        : URL.createObjectURL(file);
+      setUploadModal(null); // 업로드 끝 — 이후 분석 단계는 ParsingLoadingScreen(analyzing 상태)이 보여준다.
+      if (uploadCancelledRef.current) return;
       await startWithForm(url, file.name);
     } catch (e) {
       setError(String(e));
+      setUploadModal(null);
     } finally {
       setUploadingForm(false);
       if (fileInputRef.current) fileInputRef.current.value = "";
     }
+  }
+
+  function cancelUpload() {
+    uploadCancelledRef.current = true;
+    setUploadModal(null);
+  }
+
+  function handleFormUpload(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    uploadFormFile(file);
+  }
+
+  function handleFormDrop(e: React.DragEvent<HTMLLabelElement>) {
+    e.preventDefault();
+    setFormDragOver(false);
+    if (uploadingForm) return;
+    const file = e.dataTransfer.files?.[0];
+    if (file) uploadFormFile(file);
   }
 
   async function loadSampleForm() {
@@ -277,11 +339,16 @@ export default function ResumePreviewPage() {
 
   if (!started) {
     return (
-      <div>
-        <h1 className="mb-1 text-2xl font-bold">이력서 작성</h1>
-        <p className="mb-6 text-sm text-neutral-600">
-          이력서 양식을 업로드하면 아카이빙된 정보로 자동 채운 초안을 바로 보여드립니다.
-        </p>
+      <div className="flex min-h-[70vh] flex-col">
+        {uploadModal && (
+          <UploadProgressModal
+            fileName={uploadModal.fileName}
+            fileSizeBytes={uploadModal.fileSizeBytes}
+            progress={uploadModal.progress}
+            onCancel={cancelUpload}
+          />
+        )}
+        {analyzing && <ParsingLoadingScreen onBack={() => setStarted(false)} />}
         <FirebaseNotice />
         {error && (
           <div className="mb-4 rounded-md border border-red-300 bg-red-50 px-4 py-2 text-sm text-red-700">
@@ -304,13 +371,23 @@ export default function ResumePreviewPage() {
           </button>
         )}
 
-        <label className="flex cursor-pointer flex-col items-center justify-center gap-3 rounded-xl border-2 border-dashed border-neutral-300 bg-white p-12 text-center transition hover:border-neutral-500">
-          <span className="text-3xl">📄</span>
-          <span className="text-lg font-semibold">
-            이력서 양식을 업로드해서 이력서 작성을 시작하세요!
-          </span>
-          <span className="text-sm text-neutral-500">
-            {uploadingForm ? "업로드 중..." : "어떤 양식이든 올려주세요 (DOCX 등)"}
+        <label
+          onDragOver={(e) => {
+            e.preventDefault();
+            setFormDragOver(true);
+          }}
+          onDragLeave={() => setFormDragOver(false)}
+          onDrop={handleFormDrop}
+          className={`flex flex-1 cursor-pointer flex-col items-center justify-center gap-[21px] rounded-xl text-center transition ${
+            formDragOver ? "bg-[#eef3fe]" : ""
+          }`}
+        >
+          <p className="text-[28px] font-bold text-[#404348]">새 이력서 만들기</p>
+          <p className="text-[20px] text-[#6E737C]">
+            새로운 이력서 양식을 끌어다 놓으면 새 이력서 만들기가 시작됩니다.
+          </p>
+          <span className="rounded-full bg-[#2D71F9] px-9 py-4 text-[18px] font-bold text-white">
+            {uploadingForm ? "업로드 중..." : "이력서 양식 업로드"}
           </span>
           <input
             ref={fileInputRef}
@@ -344,21 +421,31 @@ export default function ResumePreviewPage() {
   const essayFields = fields.filter((f) => f.isEssay);
 
   return (
-    <div>
-      <div className="mb-6 flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold">이력서 초안</h1>
-          {formName && (
-            <p className="text-sm text-neutral-500">&quot;{formName}&quot; 양식 기준</p>
-          )}
+    <div className="fixed inset-0 z-30 flex flex-col bg-[#F0F1F1]">
+      {uploadModal && (
+        <UploadProgressModal
+          fileName={uploadModal.fileName}
+          fileSizeBytes={uploadModal.fileSizeBytes}
+          progress={uploadModal.progress}
+          onCancel={cancelUpload}
+        />
+      )}
+      {analyzing && <ParsingLoadingScreen onBack={() => setStarted(false)} />}
+
+      <WizardHeader onBack={() => setStarted(false)} confirmEnabled={!analyzing && !!previewFile} />
+
+      {showLoadedToast && (
+        <div className="fixed left-1/2 top-[127px] z-20 -translate-x-1/2 rounded-xl bg-[rgba(45,113,249,0.7)] px-9 py-[18px]">
+          <p className="text-[16px] font-bold tracking-[-0.32px] text-white">
+            기본정보를 새로운 이력서에서 불러왔어요. 내용을 확인하고 잘못된 부분을 수정하세요.
+          </p>
         </div>
-        <button
-          onClick={() => setStarted(false)}
-          className="text-sm text-neutral-500 hover:underline"
-        >
-          다시 업로드
-        </button>
-      </div>
+      )}
+
+      <div className="mx-auto w-full max-w-4xl flex-1 overflow-y-auto px-4 py-8">
+      {formName && (
+        <p className="mb-4 text-sm text-neutral-500">&quot;{formName}&quot; 양식 기준</p>
+      )}
 
       {error && (
         <div className="mb-4 flex items-center justify-between rounded-md border border-red-300 bg-red-50 px-4 py-2 text-sm text-red-700">
@@ -371,12 +458,6 @@ export default function ResumePreviewPage() {
               다시 시도
             </button>
           )}
-        </div>
-      )}
-
-      {analyzing && (
-        <div className="mb-4 rounded-md border border-blue-200 bg-blue-50 px-4 py-2 text-sm text-blue-800">
-          양식을 분석하고 아카이빙된 정보로 채우는 중이에요... (최대 30초 정도 걸려요)
         </div>
       )}
 
@@ -514,6 +595,7 @@ export default function ResumePreviewPage() {
           </dl>
         </section>
       )}
+      </div>
     </div>
   );
 }

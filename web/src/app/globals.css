@@ -1,15 +1,22 @@
 @import "tailwindcss";
+/* Pretendard 웹폰트는 CSS @import 대신 layout.tsx의 <link>로 로드함 — Turbopack dev 모드에서
+   "@import 문은 @charset/@layer 외 다른 규칙보다 먼저 와야 한다" 에러가 나서 이 방식으로 우회함. */
 
 :root {
   --background: #ffffff;
   --foreground: #171717;
+  --font-pretendard: "Pretendard", -apple-system, BlinkMacSystemFont, sans-serif;
+  /* Ria Sans는 무료로 임베드할 수 있는 배포처가 없어 Pretendard로 폴백함 — 실제 폰트 파일이 있으면
+     Agent_요구사항명세서.md 등에 남기지 말고 여기 @font-face로 교체해야 함 */
+  --font-ria-sans: "Ria Sans", "Pretendard", sans-serif;
 }
 
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
+  --font-sans: var(--font-pretendard);
   --font-mono: var(--font-geist-mono);
+  --font-ria-sans: var(--font-ria-sans);
 }
 
 @media (prefers-color-scheme: dark) {
@@ -22,5 +29,5 @@
 body {
   background: var(--background);
   color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  font-family: var(--font-pretendard);
 }

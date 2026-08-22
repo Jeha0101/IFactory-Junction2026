@@ -158,3 +158,7 @@ export async function updateResumeDraft(
 ): Promise<void> {
   await updateDoc(doc(resumeDraftsCol(), id), patch);
 }
+
+export async function deleteResumeDraft(id: string): Promise<void> {
+  await deleteDoc(doc(resumeDraftsCol(), id));
+}

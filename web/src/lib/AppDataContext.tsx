@@ -4,7 +4,7 @@ import { createContext, useContext, useEffect, useState, type ReactNode } from "
 import { collection, doc, onSnapshot, orderBy, query } from "firebase/firestore";
 import { db, isFirebaseConfigured } from "./firebase";
 import { DEMO_USER_ID } from "./demoUser";
-import type { CoverLetterAnswer, DocumentRecord, Experience, Profile } from "@/types";
+import type { CoverLetterAnswer, DocumentRecord, Experience, Profile, ResumeDraft } from "@/types";
 
 // 루트 레이아웃에서 한 번만 구독을 시작해서, 페이지를 이동해도(같은 세션 안에서는) Firestore를
 // 다시 읽지 않는다. onSnapshot은 최초 1회 전체를 받아온 뒤로는 변경분만 실시간으로 밀어주므로
@@ -14,6 +14,7 @@ interface AppData {
   experiences: Experience[];
   documents: DocumentRecord[];
   coverLetterAnswers: CoverLetterAnswer[];
+  resumeDrafts: ResumeDraft[];
   loading: boolean;
 }
 
@@ -22,6 +23,7 @@ const AppDataContext = createContext<AppData>({
   experiences: [],
   documents: [],
   coverLetterAnswers: [],
+  resumeDrafts: [],
   loading: true,
 });
 
@@ -34,11 +36,13 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
   const [experiences, setExperiences] = useState<Experience[]>([]);
   const [documents, setDocuments] = useState<DocumentRecord[]>([]);
   const [coverLetterAnswers, setCoverLetterAnswers] = useState<CoverLetterAnswer[]>([]);
+  const [resumeDrafts, setResumeDrafts] = useState<ResumeDraft[]>([]);
   const [loadedFlags, setLoadedFlags] = useState({
     profile: false,
     experiences: false,
     documents: false,
     coverLetterAnswers: false,
+    resumeDrafts: false,
   });
 
   useEffect(() => {
@@ -68,6 +72,15 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
         );
         setLoadedFlags((f) => ({ ...f, coverLetterAnswers: true }));
       }),
+      onSnapshot(
+        query(collection(userRef, "resumeDrafts"), orderBy("updatedAt", "desc")),
+        (snap) => {
+          setResumeDrafts(
+            snap.docs.map((d) => ({ id: d.id, ...(d.data() as Omit<ResumeDraft, "id">) }))
+          );
+          setLoadedFlags((f) => ({ ...f, resumeDrafts: true }));
+        }
+      ),
     ];
 
     return () => unsubs.forEach((u) => u());
@@ -77,7 +90,7 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
 
   return (
     <AppDataContext.Provider
-      value={{ profile, experiences, documents, coverLetterAnswers, loading }}
+      value={{ profile, experiences, documents, coverLetterAnswers, resumeDrafts, loading }}
     >
       {children}
     </AppDataContext.Provider>
