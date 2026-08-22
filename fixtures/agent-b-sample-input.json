@@ -1,0 +1,956 @@
+{
+  "sourceFile": "(서식) 2026년 ICT인턴십 하반기 국내과정 학생 지원서류.docx",
+  "note": "python-docx 전처리 원본 출력. 표 안의 병합그룹만 감지함 — 표 밖 문단 인라인 빈칸(예: '성  명 :          (인)')은 포함되지 않음, 별도 처리 필요.",
+  "tables": [
+    {
+      "tableIndex": 0,
+      "rowCount": 1,
+      "colCount": 1,
+      "rows": [
+        {
+          "rowIndex": 0,
+          "groups": [
+            {
+              "mergedGroupIndex": 0,
+              "text": "이력서\n홍길동(본인 성명으로 변경. ※ 안내된 파란색 표시는 작성 시 삭제, 분량 제한 없음)",
+              "colspan": 1
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "tableIndex": 1,
+      "rowCount": 23,
+      "colCount": 9,
+      "rows": [
+        {
+          "rowIndex": 0,
+          "groups": [
+            {
+              "mergedGroupIndex": 0,
+              "text": "인적사항",
+              "colspan": 1
+            },
+            {
+              "mergedGroupIndex": 1,
+              "text": "",
+              "colspan": 1
+            },
+            {
+              "mergedGroupIndex": 2,
+              "text": "성명",
+              "colspan": 2
+            },
+            {
+              "mergedGroupIndex": 3,
+              "text": "",
+              "colspan": 5
+            }
+          ]
+        },
+        {
+          "rowIndex": 1,
+          "groups": [
+            {
+              "mergedGroupIndex": 0,
+              "text": "인적사항",
+              "colspan": 1
+            },
+            {
+              "mergedGroupIndex": 1,
+              "text": "",
+              "colspan": 1
+            },
+            {
+              "mergedGroupIndex": 2,
+              "text": "생년월일(나이)",
+              "colspan": 2
+            },
+            {
+              "mergedGroupIndex": 3,
+              "text": "0000년 00월 00일 ( 만 00세 )",
+              "colspan": 5
+            }
+          ]
+        },
+        {
+          "rowIndex": 2,
+          "groups": [
+            {
+              "mergedGroupIndex": 0,
+              "text": "인적사항",
+              "colspan": 1
+            },
+            {
+              "mergedGroupIndex": 1,
+              "text": "",
+              "colspan": 1
+            },
+            {
+              "mergedGroupIndex": 2,
+              "text": "성별",
+              "colspan": 2
+            },
+            {
+              "mergedGroupIndex": 3,
+              "text": "",
+              "colspan": 5
+            }
+          ]
+        },
+        {
+          "rowIndex": 3,
+          "groups": [
+            {
+              "mergedGroupIndex": 0,
+              "text": "인적사항",
+              "colspan": 1
+            },
+            {
+              "mergedGroupIndex": 1,
+              "text": "",
+              "colspan": 1
+            },
+            {
+              "mergedGroupIndex": 2,
+              "text": "주소",
+              "colspan": 2
+            },
+            {
+              "mergedGroupIndex": 3,
+              "text": "",
+              "colspan": 5
+            }
+          ]
+        },
+        {
+          "rowIndex": 4,
+          "groups": [
+            {
+              "mergedGroupIndex": 0,
+              "text": "인적사항",
+              "colspan": 1
+            },
+            {
+              "mergedGroupIndex": 1,
+              "text": "",
+              "colspan": 1
+            },
+            {
+              "mergedGroupIndex": 2,
+              "text": "연락처",
+              "colspan": 2
+            },
+            {
+              "mergedGroupIndex": 3,
+              "text": "",
+              "colspan": 5
+            }
+          ]
+        },
+        {
+          "rowIndex": 5,
+          "groups": [
+            {
+              "mergedGroupIndex": 0,
+              "text": "인적사항",
+              "colspan": 1
+            },
+            {
+              "mergedGroupIndex": 1,
+              "text": "",
+              "colspan": 1
+            },
+            {
+              "mergedGroupIndex": 2,
+              "text": "E-mail",
+              "colspan": 2
+            },
+            {
+              "mergedGroupIndex": 3,
+              "text": "",
+              "colspan": 5
+            }
+          ]
+        },
+        {
+          "rowIndex": 6,
+          "groups": [
+            {
+              "mergedGroupIndex": 0,
+              "text": "",
+              "colspan": 1
+            },
+            {
+              "mergedGroupIndex": 1,
+              "text": "",
+              "colspan": 1
+            },
+            {
+              "mergedGroupIndex": 2,
+              "text": "",
+              "colspan": 7
+            }
+          ]
+        },
+        {
+          "rowIndex": 7,
+          "groups": [
+            {
+              "mergedGroupIndex": 0,
+              "text": "학력사항",
+              "colspan": 1
+            },
+            {
+              "mergedGroupIndex": 1,
+              "text": "",
+              "colspan": 1
+            },
+            {
+              "mergedGroupIndex": 2,
+              "text": "대학명",
+              "colspan": 2
+            },
+            {
+              "mergedGroupIndex": 3,
+              "text": "",
+              "colspan": 5
+            }
+          ]
+        },
+        {
+          "rowIndex": 8,
+          "groups": [
+            {
+              "mergedGroupIndex": 0,
+              "text": "학력사항",
+              "colspan": 1
+            },
+            {
+              "mergedGroupIndex": 1,
+              "text": "",
+              "colspan": 1
+            },
+            {
+              "mergedGroupIndex": 2,
+              "text": "학과명",
+              "colspan": 1
+            },
+            {
+              "mergedGroupIndex": 3,
+              "text": "주전공",
+              "colspan": 1
+            },
+            {
+              "mergedGroupIndex": 4,
+              "text": "",
+              "colspan": 5
+            }
+          ]
+        },
+        {
+          "rowIndex": 9,
+          "groups": [
+            {
+              "mergedGroupIndex": 0,
+              "text": "학력사항",
+              "colspan": 1
+            },
+            {
+              "mergedGroupIndex": 1,
+              "text": "",
+              "colspan": 1
+            },
+            {
+              "mergedGroupIndex": 2,
+              "text": "학과명",
+              "colspan": 1
+            },
+            {
+              "mergedGroupIndex": 3,
+              "text": "복수/부전공",
+              "colspan": 1
+            },
+            {
+              "mergedGroupIndex": 4,
+              "text": "(해당하지 않는 경우 공란)",
+              "colspan": 5
+            }
+          ]
+        },
+        {
+          "rowIndex": 10,
+          "groups": [
+            {
+              "mergedGroupIndex": 0,
+              "text": "학력사항",
+              "colspan": 1
+            },
+            {
+              "mergedGroupIndex": 1,
+              "text": "",
+              "colspan": 1
+            },
+            {
+              "mergedGroupIndex": 2,
+              "text": "학년(’26.9월 기준)",
+              "colspan": 2
+            },
+            {
+              "mergedGroupIndex": 3,
+              "text": "",
+              "colspan": 5
+            }
+          ]
+        },
+        {
+          "rowIndex": 11,
+          "groups": [
+            {
+              "mergedGroupIndex": 0,
+              "text": "학력사항",
+              "colspan": 1
+            },
+            {
+              "mergedGroupIndex": 1,
+              "text": "",
+              "colspan": 1
+            },
+            {
+              "mergedGroupIndex": 2,
+              "text": "전체평균학점(전학년)",
+              "colspan": 2
+            },
+            {
+              "mergedGroupIndex": 3,
+              "text": "0.0점 / 4.5점 (평균학점 / 총학점)",
+              "colspan": 5
+            }
+          ]
+        },
+        {
+          "rowIndex": 12,
+          "groups": [
+            {
+              "mergedGroupIndex": 0,
+              "text": "",
+              "colspan": 1
+            },
+            {
+              "mergedGroupIndex": 1,
+              "text": "",
+              "colspan": 1
+            },
+            {
+              "mergedGroupIndex": 2,
+              "text": "",
+              "colspan": 7
+            }
+          ]
+        },
+        {
+          "rowIndex": 13,
+          "groups": [
+            {
+              "mergedGroupIndex": 0,
+              "text": "보유 기술 및 역량",
+              "colspan": 1
+            },
+            {
+              "mergedGroupIndex": 1,
+              "text": "",
+              "colspan": 1
+            },
+            {
+              "mergedGroupIndex": 2,
+              "text": "직무",
+              "colspan": 2
+            },
+            {
+              "mergedGroupIndex": 3,
+              "text": "보유 기술, 툴",
+              "colspan": 3
+            },
+            {
+              "mergedGroupIndex": 4,
+              "text": "역량",
+              "colspan": 2
+            }
+          ]
+        },
+        {
+          "rowIndex": 14,
+          "groups": [
+            {
+              "mergedGroupIndex": 0,
+              "text": "보유 기술 및 역량",
+              "colspan": 1
+            },
+            {
+              "mergedGroupIndex": 1,
+              "text": "",
+              "colspan": 1
+            },
+            {
+              "mergedGroupIndex": 2,
+              "text": "(예시) Back-end",
+              "colspan": 2
+            },
+            {
+              "mergedGroupIndex": 3,
+              "text": "Python / Docker / Django",
+              "colspan": 3
+            },
+            {
+              "mergedGroupIndex": 4,
+              "text": "고급 / 중급 / 초급",
+              "colspan": 2
+            }
+          ]
+        },
+        {
+          "rowIndex": 15,
+          "groups": [
+            {
+              "mergedGroupIndex": 0,
+              "text": "보유 기술 및 역량",
+              "colspan": 1
+            },
+            {
+              "mergedGroupIndex": 1,
+              "text": "",
+              "colspan": 1
+            },
+            {
+              "mergedGroupIndex": 2,
+              "text": "",
+              "colspan": 2
+            },
+            {
+              "mergedGroupIndex": 3,
+              "text": "",
+              "colspan": 3
+            },
+            {
+              "mergedGroupIndex": 4,
+              "text": "",
+              "colspan": 2
+            }
+          ]
+        },
+        {
+          "rowIndex": 16,
+          "groups": [
+            {
+              "mergedGroupIndex": 0,
+              "text": "",
+              "colspan": 9
+            }
+          ]
+        },
+        {
+          "rowIndex": 17,
+          "groups": [
+            {
+              "mergedGroupIndex": 0,
+              "text": "프로젝트 경험\n(대표 사례 2건)",
+              "colspan": 1
+            },
+            {
+              "mergedGroupIndex": 1,
+              "text": "",
+              "colspan": 1
+            },
+            {
+              "mergedGroupIndex": 2,
+              "text": "프로젝트명",
+              "colspan": 3
+            },
+            {
+              "mergedGroupIndex": 3,
+              "text": "역할",
+              "colspan": 1
+            },
+            {
+              "mergedGroupIndex": 4,
+              "text": "사용기술",
+              "colspan": 2
+            },
+            {
+              "mergedGroupIndex": 5,
+              "text": "기간",
+              "colspan": 1
+            }
+          ]
+        },
+        {
+          "rowIndex": 18,
+          "groups": [
+            {
+              "mergedGroupIndex": 0,
+              "text": "프로젝트 경험\n(대표 사례 2건)",
+              "colspan": 1
+            },
+            {
+              "mergedGroupIndex": 1,
+              "text": "",
+              "colspan": 1
+            },
+            {
+              "mergedGroupIndex": 2,
+              "text": "(예시) AI 챗봇 개발",
+              "colspan": 3
+            },
+            {
+              "mergedGroupIndex": 3,
+              "text": "백엔드 개발",
+              "colspan": 1
+            },
+            {
+              "mergedGroupIndex": 4,
+              "text": "Python, FastAPI",
+              "colspan": 2
+            },
+            {
+              "mergedGroupIndex": 5,
+              "text": "’25.3.~6.",
+              "colspan": 1
+            }
+          ]
+        },
+        {
+          "rowIndex": 19,
+          "groups": [
+            {
+              "mergedGroupIndex": 0,
+              "text": "프로젝트 경험\n(대표 사례 2건)",
+              "colspan": 1
+            },
+            {
+              "mergedGroupIndex": 1,
+              "text": "",
+              "colspan": 1
+            },
+            {
+              "mergedGroupIndex": 2,
+              "text": "",
+              "colspan": 3
+            },
+            {
+              "mergedGroupIndex": 3,
+              "text": "",
+              "colspan": 1
+            },
+            {
+              "mergedGroupIndex": 4,
+              "text": "",
+              "colspan": 2
+            },
+            {
+              "mergedGroupIndex": 5,
+              "text": "",
+              "colspan": 1
+            }
+          ]
+        },
+        {
+          "rowIndex": 20,
+          "groups": [
+            {
+              "mergedGroupIndex": 0,
+              "text": "",
+              "colspan": 9
+            }
+          ]
+        },
+        {
+          "rowIndex": 21,
+          "groups": [
+            {
+              "mergedGroupIndex": 0,
+              "text": "기타 특이사항",
+              "colspan": 1
+            },
+            {
+              "mergedGroupIndex": 1,
+              "text": "",
+              "colspan": 1
+            },
+            {
+              "mergedGroupIndex": 2,
+              "text": "(수상 경력, 인턴 경험, 협업 경험 등 관련 활동 내용이 있는 경우 기재)",
+              "colspan": 7
+            }
+          ]
+        },
+        {
+          "rowIndex": 22,
+          "groups": [
+            {
+              "mergedGroupIndex": 0,
+              "text": "포트폴리오",
+              "colspan": 1
+            },
+            {
+              "mergedGroupIndex": 1,
+              "text": "",
+              "colspan": 1
+            },
+            {
+              "mergedGroupIndex": 2,
+              "text": "(Github, Notion, Blog 링크 등 추가할 사항이 있는 경우 기재)",
+              "colspan": 7
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "tableIndex": 2,
+      "rowCount": 13,
+      "colCount": 2,
+      "rows": [
+        {
+          "rowIndex": 0,
+          "groups": [
+            {
+              "mergedGroupIndex": 0,
+              "text": "자기소개서\n홍길동 (본인 성명으로 변경, 분량 제한 준수)",
+              "colspan": 2
+            }
+          ]
+        },
+        {
+          "rowIndex": 1,
+          "groups": [
+            {
+              "mergedGroupIndex": 0,
+              "text": "",
+              "colspan": 2
+            }
+          ]
+        },
+        {
+          "rowIndex": 2,
+          "groups": [
+            {
+              "mergedGroupIndex": 0,
+              "text": "지원동기",
+              "colspan": 1
+            },
+            {
+              "mergedGroupIndex": 1,
+              "text": "(공백 포함 500자 이내)",
+              "colspan": 1
+            }
+          ]
+        },
+        {
+          "rowIndex": 3,
+          "groups": [
+            {
+              "mergedGroupIndex": 0,
+              "text": "",
+              "colspan": 2
+            }
+          ]
+        },
+        {
+          "rowIndex": 4,
+          "groups": [
+            {
+              "mergedGroupIndex": 0,
+              "text": "",
+              "colspan": 2
+            }
+          ]
+        },
+        {
+          "rowIndex": 5,
+          "groups": [
+            {
+              "mergedGroupIndex": 0,
+              "text": "직무 관련 경험\n(프로젝트 경험, 업무용 TOOL 사용 경험, 직무 관련 교육 수강 등)",
+              "colspan": 1
+            },
+            {
+              "mergedGroupIndex": 1,
+              "text": "(공백 포함 1,000자 이내)",
+              "colspan": 1
+            }
+          ]
+        },
+        {
+          "rowIndex": 6,
+          "groups": [
+            {
+              "mergedGroupIndex": 0,
+              "text": "",
+              "colspan": 2
+            }
+          ]
+        },
+        {
+          "rowIndex": 7,
+          "groups": [
+            {
+              "mergedGroupIndex": 0,
+              "text": "",
+              "colspan": 2
+            }
+          ]
+        },
+        {
+          "rowIndex": 8,
+          "groups": [
+            {
+              "mergedGroupIndex": 0,
+              "text": "문제 해결 및 도전 경험",
+              "colspan": 1
+            },
+            {
+              "mergedGroupIndex": 1,
+              "text": "(공백 포함 500자 이내)",
+              "colspan": 1
+            }
+          ]
+        },
+        {
+          "rowIndex": 9,
+          "groups": [
+            {
+              "mergedGroupIndex": 0,
+              "text": "",
+              "colspan": 2
+            }
+          ]
+        },
+        {
+          "rowIndex": 10,
+          "groups": [
+            {
+              "mergedGroupIndex": 0,
+              "text": "",
+              "colspan": 2
+            }
+          ]
+        },
+        {
+          "rowIndex": 11,
+          "groups": [
+            {
+              "mergedGroupIndex": 0,
+              "text": "기대 성과 목표\n(성장 및 진로 계획 등)",
+              "colspan": 1
+            },
+            {
+              "mergedGroupIndex": 1,
+              "text": "(공백 포함 500자 이내)",
+              "colspan": 1
+            }
+          ]
+        },
+        {
+          "rowIndex": 12,
+          "groups": [
+            {
+              "mergedGroupIndex": 0,
+              "text": "",
+              "colspan": 2
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "tableIndex": 3,
+      "rowCount": 3,
+      "colCount": 1,
+      "rows": [
+        {
+          "rowIndex": 0,
+          "groups": [
+            {
+              "mergedGroupIndex": 0,
+              "text": "",
+              "colspan": 1
+            }
+          ]
+        },
+        {
+          "rowIndex": 1,
+          "groups": [
+            {
+              "mergedGroupIndex": 0,
+              "text": "2026년 ICT 학점연계 프로젝트 인턴십 \n하반기 국내과정 신청 자격 셀프 체크리스트",
+              "colspan": 1
+            }
+          ]
+        },
+        {
+          "rowIndex": 2,
+          "groups": [
+            {
+              "mergedGroupIndex": 0,
+              "text": "",
+              "colspan": 1
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "tableIndex": 4,
+      "rowCount": 6,
+      "colCount": 4,
+      "rows": [
+        {
+          "rowIndex": 0,
+          "groups": [
+            {
+              "mergedGroupIndex": 0,
+              "text": "No.",
+              "colspan": 1
+            },
+            {
+              "mergedGroupIndex": 1,
+              "text": "내용",
+              "colspan": 1
+            },
+            {
+              "mergedGroupIndex": 2,
+              "text": "확인 여부",
+              "colspan": 2
+            }
+          ]
+        },
+        {
+          "rowIndex": 1,
+          "groups": [
+            {
+              "mergedGroupIndex": 0,
+              "text": "No.",
+              "colspan": 1
+            },
+            {
+              "mergedGroupIndex": 1,
+              "text": "내용",
+              "colspan": 1
+            },
+            {
+              "mergedGroupIndex": 2,
+              "text": "해당",
+              "colspan": 1
+            },
+            {
+              "mergedGroupIndex": 3,
+              "text": "비해당",
+              "colspan": 1
+            }
+          ]
+        },
+        {
+          "rowIndex": 2,
+          "groups": [
+            {
+              "mergedGroupIndex": 0,
+              "text": "1",
+              "colspan": 1
+            },
+            {
+              "mergedGroupIndex": 1,
+              "text": "전체 교육과정의 50% 이상 이수하셨습니까?\n※ 2026년2학기 기준",
+              "colspan": 1
+            },
+            {
+              "mergedGroupIndex": 2,
+              "text": "",
+              "colspan": 1
+            },
+            {
+              "mergedGroupIndex": 3,
+              "text": "",
+              "colspan": 1
+            }
+          ]
+        },
+        {
+          "rowIndex": 3,
+          "groups": [
+            {
+              "mergedGroupIndex": 0,
+              "text": "2",
+              "colspan": 1
+            },
+            {
+              "mergedGroupIndex": 1,
+              "text": "참여 승인 대학의 승인 학과 소속 전공/부전공/복수전공자입니까?\n※ 2026년 2학기 기준 / 참여 승인 대학 및 학과 리스트(클릭) 홈페이지 공지사항 참조",
+              "colspan": 1
+            },
+            {
+              "mergedGroupIndex": 2,
+              "text": "",
+              "colspan": 1
+            },
+            {
+              "mergedGroupIndex": 3,
+              "text": "",
+              "colspan": 1
+            }
+          ]
+        },
+        {
+          "rowIndex": 4,
+          "groups": [
+            {
+              "mergedGroupIndex": 0,
+              "text": "3",
+              "colspan": 1
+            },
+            {
+              "mergedGroupIndex": 1,
+              "text": "인턴십 기간 동안 정상적으로 학점 이수가 가능한 재학생입니까?\n※ 현재 휴학생 신분이어도, 인턴십 수행 기간에는 재학생 신분이어야 함\n※ 초과 학기, 졸업 유예일 경우에도 수강 신청을 통하여 학점 이수가 가능해야 함\n※ 소속 대학에 사전 확인 필수",
+              "colspan": 1
+            },
+            {
+              "mergedGroupIndex": 2,
+              "text": "",
+              "colspan": 1
+            },
+            {
+              "mergedGroupIndex": 3,
+              "text": "",
+              "colspan": 1
+            }
+          ]
+        },
+        {
+          "rowIndex": 5,
+          "groups": [
+            {
+              "mergedGroupIndex": 0,
+              "text": "4",
+              "colspan": 1
+            },
+            {
+              "mergedGroupIndex": 1,
+              "text": "인턴십 참여로 인해 학점 이수, 졸업 등에 문제가 없음을 소속 대학에 확인하였습니까?",
+              "colspan": 1
+            },
+            {
+              "mergedGroupIndex": 2,
+              "text": "",
+              "colspan": 1
+            },
+            {
+              "mergedGroupIndex": 3,
+              "text": "",
+              "colspan": 1
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}
