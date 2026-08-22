@@ -107,7 +107,7 @@ export default function ResumePreviewPage() {
       const merged = { ...initialValues, ...overrideValues };
       setFieldValues(merged);
 
-      await renderPreview(url, merged);
+      await renderPreview(url, merged, analyzed);
     } catch (e) {
       setError(String(e));
     } finally {
@@ -115,15 +115,26 @@ export default function ResumePreviewPage() {
     }
   }
 
-  async function renderPreview(url: string, values: Record<string, string>) {
+  async function renderPreview(
+    url: string,
+    values: Record<string, string>,
+    fieldsForLabels: AnalyzedField[] = fields
+  ) {
     setRendering(true);
     try {
+      // ⚠️ fields state는 setFields 직후 같은 함수 안에서 바로 읽으면 아직 갱신 전이라
+      // analyzeAndRender에서 호출할 땐 방금 분석한 목록을 fieldsForLabels로 직접 넘겨받는다.
+      const rawLabelById = new Map(fieldsForLabels.map((f) => [f.id, f.rawLabel]));
       const res = await fetch("/api/render-docx", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           fileUrl: url,
-          values: Object.entries(values).map(([id, value]) => ({ id, value })),
+          values: Object.entries(values).map(([id, value]) => ({
+            id,
+            value,
+            rawLabel: rawLabelById.get(id),
+          })),
         }),
       });
       if (!res.ok) throw new Error((await res.json()).error ?? `미리보기 생성 실패 (${res.status})`);
@@ -234,12 +245,17 @@ export default function ResumePreviewPage() {
     setDownloading(true);
     setError(null);
     try {
+      const rawLabelById = new Map(fields.map((f) => [f.id, f.rawLabel]));
       const res = await fetch("/api/render-docx", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           fileUrl: formFileUrl,
-          values: Object.entries(fieldValues).map(([id, value]) => ({ id, value })),
+          values: Object.entries(fieldValues).map(([id, value]) => ({
+            id,
+            value,
+            rawLabel: rawLabelById.get(id),
+          })),
         }),
       });
       if (!res.ok) throw new Error((await res.json()).error ?? `다운로드 실패 (${res.status})`);

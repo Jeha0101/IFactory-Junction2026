@@ -30,6 +30,7 @@ export interface FillValueEntry {
   row: number;
   mergedGroupIndex: number;
   value: string;
+  rawLabel?: string; // 있으면 mergedGroupIndex 대신 라벨 텍스트로 값 칸을 다시 찾는다 (docx_tools.py 참고)
 }
 
 /** docx 파일(버퍼)의 표 구조를 추출한다 (python-docx, 결정적/정확). */

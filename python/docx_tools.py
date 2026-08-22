@@ -78,19 +78,36 @@ def extract_structure(input_path: str) -> dict:
     return result
 
 
+def _normalize_label(text: str) -> str:
+    """라벨 텍스트 비교용 정규화 — 공백/하이픈 표기 차이를 무시한다.
+    실제 문서에서 "E-mail" 라벨이 "E - mail"(공백 포함)로 추출되는 경우가 확인됨(2026-08-23),
+    단순 소문자 substring 매칭으로는 이런 표기 차이를 못 잡아서 공백/하이픈을 아예 제거하고 비교한다.
+    """
+    return "".join(text.lower().split()).replace("-", "")
+
+
 def fill_values(input_path: str, values: list[dict], output_path: str) -> None:
     """extract_structure()와 같은 좌표계(table/row/mergedGroupIndex)로 지정된 값을
     원본 docx의 정확한 셀에 써넣고 output_path로 저장한다. 원본 파일은 건드리지 않는다.
 
-    values: [{"table": int, "row": int, "mergedGroupIndex": int, "value": str}, ...]
+    values: [{"table": int, "row": int, "mergedGroupIndex": int, "value": str, "rawLabel": str?}, ...]
 
-    ⚠️ 방어 로직: 에이전트 B가 "라벨 칸"과 "값 칸"을 혼동해서 라벨 자신의 mergedGroupIndex를
-    돌려주는 경우가 실제로 확인됐다(2026-08-23). "라벨 뒤에 빈 칸/힌트 칸이 이어진다"는 표
-    구조 관례상, 지정된 인덱스가 그 행의 마지막 그룹이 아니면 마지막 그룹(=값 칸)으로 보정한다.
+    ⚠️ 방어 로직 (2026-08-23 갱신): 에이전트 B가 cellRef.mergedGroupIndex를 값 칸이 아닌
+    엉뚱한 인덱스(라벨 칸이거나 그 이전 빈 칸)로 돌려주는 경우가 실제로 확인됨. 예전엔 "그 행의
+    마지막 그룹으로 보정"했는데, 이건 한 행에 라벨-값 쌍이 **하나뿐일 때만** 맞는 가정이었다.
+    실제 양식에는 "휴대폰/전화번호", "E-mail/SNS"처럼 **한 행에 라벨-값 쌍이 두 개 이상** 있는
+    경우가 흔한데, 이때 무조건 "마지막 그룹"으로 보내면 완전히 다른 필드(예: 이메일 값이 SNS
+    칸에 들어감)로 값이 새어버리는 걸 실측으로 확인함.
+
+    그래서 `rawLabel`이 주어지면, cellRef 인덱스를 신뢰하는 대신 **그 행 안에서 rawLabel과
+    텍스트가 일치하는 그룹을 직접 찾아 그 바로 다음 그룹**을 값 칸으로 쓴다 (라벨 바로 다음 칸이
+    값/힌트 칸이라는 표 구조 관례 그대로, 단 이번엔 라벨 자체를 텍스트로 특정해서 같은 행 안의
+    다른 라벨-값 쌍과 섞이지 않게 함). rawLabel이 없거나 행에서 못 찾으면 예전 방식(마지막 그룹)으로
+    폴백한다.
     """
     doc = Document(input_path)
-    value_map = {
-        (v["table"], v["row"], v["mergedGroupIndex"]): v["value"] for v in values
+    value_map: dict[tuple[int, int, int], dict] = {
+        (v["table"], v["row"], v["mergedGroupIndex"]): v for v in values
     }
 
     for ti, table in enumerate(doc.tables):
@@ -99,9 +116,21 @@ def fill_values(input_path: str, values: list[dict], output_path: str) -> None:
             last_index = len(groups) - 1
             for gi, (cell, _text, _span) in enumerate(groups):
                 key = (ti, ri, gi)
-                if key in value_map:
+                if key not in value_map:
+                    continue
+                entry = value_map[key]
+                raw_label = entry.get("rawLabel")
+                target_cell = None
+                if raw_label:
+                    needle = _normalize_label(raw_label)
+                    for label_idx, (_c, text, _s) in enumerate(groups):
+                        if needle and needle in _normalize_label(text):
+                            value_idx = min(label_idx + 1, last_index)
+                            target_cell = groups[value_idx][0]
+                            break
+                if target_cell is None:
                     target_cell = groups[last_index][0] if gi != last_index else cell
-                    target_cell.text = value_map[key]
+                target_cell.text = entry["value"]
 
     doc.save(output_path)
 

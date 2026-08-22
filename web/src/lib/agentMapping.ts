@@ -87,14 +87,20 @@ export const CANONICAL_KEY_KEYWORDS: Record<string, string[]> = {
 // 단어가 들어있어서 검증을 통과해버린 사고가 있었음 — 2026-08-23 확인)
 const LABEL_MAX_LENGTH = 25;
 
+/** 라벨 비교용 정규화 — 공백/하이픈 표기 차이를 무시한다("E - mail" vs "e-mail" 같은 경우,
+ * 실제 문서에서 확인됨 2026-08-23). */
+function normalizeLabel(text: string): string {
+  return text.toLowerCase().replace(/\s+/g, "").replace(/-/g, "");
+}
+
 /** rowLabels(그 cellRef가 속한 행의 실제 라벨 텍스트들)에 canonicalKey의 키워드가 하나라도
  * 있는지 확인한다. 이 canonicalKey에 등록된 키워드가 없으면(모르는 키) 검증을 건너뛰고 통과시킨다. */
 export function isPlausibleMatch(canonicalKey: string, rowLabels: string[]): boolean {
   const keywords = CANONICAL_KEY_KEYWORDS[canonicalKey];
   if (!keywords || keywords.length === 0) return true; // 모르는 키는 막지 않음
   const shortLabels = rowLabels.filter((t) => t.length <= LABEL_MAX_LENGTH);
-  const haystack = shortLabels.join(" ").toLowerCase();
-  return keywords.some((kw) => haystack.includes(kw.toLowerCase()));
+  const haystack = normalizeLabel(shortLabels.join(" "));
+  return keywords.some((kw) => haystack.includes(normalizeLabel(kw)));
 }
 
 function nonEmpty(v: unknown): v is string {

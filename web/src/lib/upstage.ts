@@ -78,7 +78,7 @@ export async function getJob(jobId: string): Promise<any> {
 
 export async function pollJob(
   jobId: string,
-  { intervalMs = 2000, timeoutMs = 90_000 }: { intervalMs?: number; timeoutMs?: number } = {}
+  { intervalMs = 2000, timeoutMs = 240_000 }: { intervalMs?: number; timeoutMs?: number } = {}
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
 ): Promise<any> {
   const start = Date.now();
@@ -87,7 +87,7 @@ export async function pollJob(
     if (job.status === "completed" || job.status === "failed") return job;
     await new Promise((r) => setTimeout(r, intervalMs));
   }
-  throw new Error("Upstage Job 폴링 타임아웃 (90초 초과)");
+  throw new Error(`Upstage Job 폴링 타임아웃 (${Math.round(timeoutMs / 1000)}초 초과)`);
 }
 
 /** 에이전트가 JSON이 아니라 평범한 문장으로 응답했을 때 (예: "정보가 부족합니다.") 던지는 에러.
