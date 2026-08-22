@@ -168,6 +168,26 @@ python-docx로 표를 순회하며, 병합된 셀을 **셀 객체 identity(`id(c
 >
 > 참고로 이 예시 파일을 보면 이번 양식엔 두 가지 종류의 표가 섞여 있다는 게 보입니다: (1) `tableIndex 1`처럼 "라벨→빈칸" 패턴이 명확한 표, (2) `tableIndex 4`(자격 체크리스트)처럼 라벨-값 페어가 아니라 그냥 데이터 표(체크박스형)인 것. 에이전트 B는 후자를 억지로 필드 매핑하지 말고 `canonicalKey: null`로 넘기거나 "프로필 데이터로 채울 대상이 아님"으로 표시해야 합니다 (아래 만족 조건 참고).
 
+> ⚠️ **`fixtures/agent-b-sample-input.json`을 Studio UI에 파일로 업로드하려고 하면 안 됩니다** —
+> Studio가 지원하는 업로드 포맷은 PDF·이미지·오피스(DOC/DOCX/PPT/PPTX/XLS/XLSX)·HWP/HWPX·이메일/웹뿐이라
+> **JSON은 지원되지 않습니다** (실제로 시도해서 확인됨). 원본 docx 파일만 업로드해야 합니다.
+>
+> **대신 API 호출 단계에서 이 JSON을 텍스트로 함께 보내면 Instruct가 실제로 읽습니다** — 직접
+> 테스트해서 확인함(2026-08-23). `input`에 `{"type": "input_file", "file_id": ...}` 뿐 아니라
+> `{"type": "input_text", "text": "<JSON 문자열>"}`를 같은 배열에 추가하면, Instruct가 "사용자가
+> 제공한 python-docx 전처리 결과의 mergedGroupIndex 좌표를 써야 한다"고 실제로 인지하는 것까지
+> 확인했습니다. 다만 **이번 테스트에서는 최종 응답이 원하는 JSON 배열이 아니라 "이렇게 좌표를 잡으면
+> 됩니다" 하는 설명문으로 나왔습니다** — 즉 데이터는 도달하지만, 지금 Instruct 프롬프트가 이걸
+> "분석해서 설명"하는 걸로 처리하고 있다는 뜻입니다. Studio에서 이 방식을 쓰려면 Instruct 프롬프트에
+> 다음을 명시적으로 추가하는 걸 권장합니다:
+> 1. "두 가지를 받는다: (1) 문서 원문, (2) python-docx로 미리 계산된 mergedGroupIndex 좌표가 담긴
+>    JSON. **cellRef는 항상 이 JSON의 좌표를 그대로 쓰고, HTML의 rowspan/colspan에서 직접 계산하지
+>    마라.**"
+> 2. "결과는 설명 없이 **오직 지정된 JSON 배열 형식으로만** 응답해라 (분석 과정 설명 금지)."
+>
+> 급하지 않습니다 — 지금은 `docx_tools.fill_values()`의 방어 로직(아래 cellRef 버그 참고)으로
+> 이미 우회돼 있어서, 시간 될 때 프롬프트를 개선해보고 안 되면 지금 우회 로직으로 계속 가도 됩니다.
+
 ### 에이전트 B(AI)가 판단할 것
 전처리된 (라벨, 힌트) 목록을 받아서:
 1. 각 라벨을 §1 필드 사전의 **canonicalKey로 매핑** (매칭 안 되면 `null` + 원문 라벨 보존, 억지로 끼워 맞추지 않음)
@@ -210,6 +230,24 @@ python-docx로 표를 순회하며, 병합된 셀을 **셀 객체 identity(`id(c
   }
 ]
 ```
+
+> ⚠️ **실제 연동 테스트에서 확인된 버그 (2026-08-23)**: 실제 배포된 에이전트 B가 "성명" 라벨에 대해
+> `cellRef.mergedGroupIndex`를 **라벨 자기 자신의 위치**(예시에서 2)로 반환하는 경우가 있었음 — 원래
+> 의도는 **값을 써넣을 빈 칸의 위치**(예시에서 3)를 가리켜야 함. 지금은 `python/docx_tools.py`의
+> `fill_values()`에 "지정된 인덱스가 그 행의 마지막 그룹이 아니면 마지막 그룹(값 칸)으로 자동 보정"하는
+> 방어 로직을 넣어서 우회했지만, 원인은 Studio Instruct 프롬프트가 "라벨 다음에 오는 칸"이 아니라
+> "라벨이 있는 칸"을 가리키도록 판단하고 있어서로 추정됨. 프롬프트에서 "cellRef는 값을 써넣을 빈
+> 칸(라벨 바로 다음/마지막 병합그룹)을 가리켜야 하며, 라벨이 있는 칸 자체를 가리키면 안 된다"를
+> 명시적으로 강조하면 개선될 것으로 보임.
+>
+> **또한 canonicalKey가 한글이 아니라 영어 snake_case로 나오고 있음** (`korea_name`,
+> `date_of_birth`, `gender`, `address` 등 — 에이전트 A와 일치, 아래 §1 사전은 한글로 작성된 초안이라
+> 실제와 다름). 두 에이전트가 서로 일치하기만 하면 매칭엔 문제없어서 프론트/백엔드 쪽에서 영어 키
+> 그대로 쓰도록 맞춰뒀습니다 — §1의 한글 사전은 "개념 정리용 초안"으로 참고하되, 실제 계약은 두
+> 에이전트가 실제로 합의한 영어 키 목록(korea_name, english_name, professional_title,
+> phone_number, email_address, address, linkedin_url, sns, date_of_birth, gender, major, gpa,
+> self_introduction, military, education_records[], work_experience_records[],
+> project_experience_records[], skills[], award[], language_tests[])입니다.
 
 ### 만족 조건 (체크리스트)
 - [ ] `canonicalKey`가 §1 사전과 정확히 일치 (Agent A와 동일한 사전 사용 — 매칭 단계의 전제조건)

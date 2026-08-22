@@ -36,6 +36,11 @@ python docx_tools.py fill 양식.docx values.json 결과.docx
 ]
 ```
 
+⚠️ **방어 로직**: 실제 배포된 에이전트 B가 라벨 칸 자신의 mergedGroupIndex를 반환하는 경우가
+확인되어(Agent_요구사항명세서.md §3 참고), `fill_values()`는 지정된 인덱스가 그 행의 마지막
+그룹이 아니면 자동으로 마지막 그룹(=값 칸)으로 보정합니다. 에이전트 B 프롬프트가 고쳐져도 이 로직은
+안전하게 그대로 둬도 됩니다(마지막 그룹을 가리키면 보정이 발생하지 않음).
+
 **실제 검증 완료**: 오늘 샘플 양식(`web/public/samples/sample-form.docx`)으로 extract→fill 왕복
 테스트 통과, `docx-preview`로 브라우저 렌더링까지 서식 유지 확인함.
 
