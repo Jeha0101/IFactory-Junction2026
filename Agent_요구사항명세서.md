@@ -76,10 +76,20 @@
 `Parse → Classify → Extract`
 
 - **Classify 문서종**: `이력서 / 자소서 / 어학성적 / 자격증 / 대외활동증명서 / 기타`
+  > **2026-08-23 실사용 확인**: 실제로는 이 목록에 없는 값("재학증명서", "수료증" 등)도 반환되고
+  > 있고, 프론트는 이걸 자유 문자열로 받도록 이미 고쳐놨습니다(`DocumentCategory` 타입) — Classify
+  > 라벨을 이 6개로 제한하려고 애쓸 필요 없습니다, 문서 실제 종류를 자연스럽게 반환하면 됩니다.
 - **문서종별 Extract 스키마**를 따로 만들어야 함 (하나로 퉁치지 말 것):
   - **이력서**: §1의 canonicalKey들을 스키마 항목명으로 그대로 사용 (기술역량·프로젝트경험은 List 타입 테이블로)
   - **자소서**: `자소서QnA` — List 타입 테이블, `{질문, 답변}`
   - **자격증/어학성적**: `{명칭, 발급기관, 취득일, 만료일}`
+
+  > ⚠️ **남은 요청사항 (2026-08-23 기준, 아직 구현 안 됨)**: 지금 실제 배포본은 이력서가 아닌
+  > 문서에 대해 위 문서종별 Extract를 하지 않고, **Classify 라벨 문자열 하나만** 반환하고
+  > 있습니다(정상 동작으로 확인함, QA_수정요구사항.md §4-5). 즉 자격증/어학성적/증명서류의
+  > 취득일·만료일이 전혀 안 나오고 있어서 **기능3(만료일 관리)이 막혀있는 상태**입니다. 시간
+  > 되시면 이력서 외 문서종에도 위 `{명칭, 발급기관, 취득일, 만료일}` 스키마의 Extract를 추가
+  > 부탁드립니다 — 급하진 않고, 시간이 없으면 이번 데모에서는 기능3을 스코프 아웃해도 됩니다.
 
 ### 출력 예시 (이력서 1건 처리 시)
 
@@ -172,21 +182,13 @@ python-docx로 표를 순회하며, 병합된 셀을 **셀 객체 identity(`id(c
 > Studio가 지원하는 업로드 포맷은 PDF·이미지·오피스(DOC/DOCX/PPT/PPTX/XLS/XLSX)·HWP/HWPX·이메일/웹뿐이라
 > **JSON은 지원되지 않습니다** (실제로 시도해서 확인됨). 원본 docx 파일만 업로드해야 합니다.
 >
-> **대신 API 호출 단계에서 이 JSON을 텍스트로 함께 보내면 Instruct가 실제로 읽습니다** — 직접
-> 테스트해서 확인함(2026-08-23). `input`에 `{"type": "input_file", "file_id": ...}` 뿐 아니라
-> `{"type": "input_text", "text": "<JSON 문자열>"}`를 같은 배열에 추가하면, Instruct가 "사용자가
-> 제공한 python-docx 전처리 결과의 mergedGroupIndex 좌표를 써야 한다"고 실제로 인지하는 것까지
-> 확인했습니다. 다만 **이번 테스트에서는 최종 응답이 원하는 JSON 배열이 아니라 "이렇게 좌표를 잡으면
-> 됩니다" 하는 설명문으로 나왔습니다** — 즉 데이터는 도달하지만, 지금 Instruct 프롬프트가 이걸
-> "분석해서 설명"하는 걸로 처리하고 있다는 뜻입니다. Studio에서 이 방식을 쓰려면 Instruct 프롬프트에
-> 다음을 명시적으로 추가하는 걸 권장합니다:
-> 1. "두 가지를 받는다: (1) 문서 원문, (2) python-docx로 미리 계산된 mergedGroupIndex 좌표가 담긴
->    JSON. **cellRef는 항상 이 JSON의 좌표를 그대로 쓰고, HTML의 rowspan/colspan에서 직접 계산하지
->    마라.**"
-> 2. "결과는 설명 없이 **오직 지정된 JSON 배열 형식으로만** 응답해라 (분석 과정 설명 금지)."
->
-> 급하지 않습니다 — 지금은 `docx_tools.fill_values()`의 방어 로직(아래 cellRef 버그 참고)으로
-> 이미 우회돼 있어서, 시간 될 때 프롬프트를 개선해보고 안 되면 지금 우회 로직으로 계속 가도 됩니다.
+> **[정정, 2026-08-23]** 한때 이 자리에 "API 호출 시 python-docx 전처리 JSON을 `input_text`로
+> 같이 보내면 에이전트 B가 설명문으로 응답하니 프롬프트를 고쳐야 한다"는 내용이 있었는데,
+> **틀린 진단이라 삭제했습니다**. 팀원 프롬프트는 처음부터 문제없었고, 원인은 개발자(Claude)
+> 쪽 API 호출 코드가 그 JSON을 `input_text`로 주입한 것이었습니다(모델이 "이 데이터를 분석해서
+> 설명해줘"로 오인). 그 주입 코드를 제거하니 파일만 보냈을 때 정상 JSON이 나오는 것으로
+> 확인됨(A/B 라이브 테스트). **에이전트 B 프롬프트는 지금 그대로 두면 됩니다** — 전처리 JSON을
+> Studio에 별도로 넣어줄 필요 자체가 없어졌습니다.
 
 ### 에이전트 B(AI)가 판단할 것
 전처리된 (라벨, 힌트) 목록을 받아서:
@@ -243,11 +245,15 @@ python-docx로 표를 순회하며, 병합된 셀을 **셀 객체 identity(`id(c
 > **또한 canonicalKey가 한글이 아니라 영어 snake_case로 나오고 있음** (`korea_name`,
 > `date_of_birth`, `gender`, `address` 등 — 에이전트 A와 일치, 아래 §1 사전은 한글로 작성된 초안이라
 > 실제와 다름). 두 에이전트가 서로 일치하기만 하면 매칭엔 문제없어서 프론트/백엔드 쪽에서 영어 키
-> 그대로 쓰도록 맞춰뒀습니다 — §1의 한글 사전은 "개념 정리용 초안"으로 참고하되, 실제 계약은 두
-> 에이전트가 실제로 합의한 영어 키 목록(korea_name, english_name, professional_title,
-> phone_number, email_address, address, linkedin_url, sns, date_of_birth, gender, major, gpa,
-> self_introduction, military, education_records[], work_experience_records[],
-> project_experience_records[], skills[], award[], language_tests[])입니다.
+> 그대로 쓰도록 맞춰뒀습니다 — §1의 한글 사전은 "개념 정리용 초안"으로 참고하되, **실제 계약은
+> `web/src/lib/agentMapping.ts`의 `PROFILE_FIELD_MAP`이 최신 소스**입니다:
+> `korea_name, date_of_birth, gender, address, phone_number, email_address, university, major,
+> my_gpa, avg_gpa, military, linkedin_url` (+ 자소서는 `self_introduce: [{question, answer}]`).
+>
+> **[정정, 2026-08-23]** university(학교)와 major(전공)는 **분리된 별도 필드**입니다(예전엔 `major`
+> 하나에 합쳐 쓴 적도 있었는데 지금은 나눠서 옴). gpa도 `my_gpa`(본인 평균학점)/`avg_gpa`(총학점
+> 만점 기준)로 분리돼서 옵니다. 자소서 Q&A 필드명은 `self_introduction`이 아니라 **`self_introduce`**이니
+> 철자에 주의하세요 (실제로 이 이름으로 와야 프론트 매핑 코드가 인식합니다).
 
 ### 만족 조건 (체크리스트)
 - [ ] `canonicalKey`가 §1 사전과 정확히 일치 (Agent A와 동일한 사전 사용 — 매칭 단계의 전제조건)
