@@ -83,6 +83,10 @@ def fill_values(input_path: str, values: list[dict], output_path: str) -> None:
     원본 docx의 정확한 셀에 써넣고 output_path로 저장한다. 원본 파일은 건드리지 않는다.
 
     values: [{"table": int, "row": int, "mergedGroupIndex": int, "value": str}, ...]
+
+    ⚠️ 방어 로직: 에이전트 B가 "라벨 칸"과 "값 칸"을 혼동해서 라벨 자신의 mergedGroupIndex를
+    돌려주는 경우가 실제로 확인됐다(2026-08-23). "라벨 뒤에 빈 칸/힌트 칸이 이어진다"는 표
+    구조 관례상, 지정된 인덱스가 그 행의 마지막 그룹이 아니면 마지막 그룹(=값 칸)으로 보정한다.
     """
     doc = Document(input_path)
     value_map = {
@@ -92,10 +96,12 @@ def fill_values(input_path: str, values: list[dict], output_path: str) -> None:
     for ti, table in enumerate(doc.tables):
         for ri, row in enumerate(table.rows):
             groups = _merge_groups_with_cells(row)
+            last_index = len(groups) - 1
             for gi, (cell, _text, _span) in enumerate(groups):
                 key = (ti, ri, gi)
                 if key in value_map:
-                    cell.text = value_map[key]
+                    target_cell = groups[last_index][0] if gi != last_index else cell
+                    target_cell.text = value_map[key]
 
     doc.save(output_path)
 

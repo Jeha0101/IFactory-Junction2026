@@ -64,6 +64,7 @@ export default function ResumePreviewPage() {
   const [saving, setSaving] = useState(false);
   const [savedAt, setSavedAt] = useState<number | null>(null);
   const [downloading, setDownloading] = useState(false);
+  const [fillStats, setFillStats] = useState<{ total: number; matched: number } | null>(null);
 
   // CTA 화면에서 "이어서 작성 중인 초안"이 있는지 미리 확인
   useEffect(() => {
@@ -96,20 +97,46 @@ export default function ResumePreviewPage() {
       .catch((e) => setError(String(e)));
   }, [started]);
 
+  // 에이전트 B로 필드를 감지하고, 아카이빙된 값과 매칭해서 실제로 채운 docx를 받아온다.
+  // 실패하면(에이전트 미설정, 매칭 실패 등) 원본 빈 양식을 그대로 보여주는 걸로 조용히 폴백한다.
+  async function fillFormViaAgentB(fileUrl: string, fileName: string): Promise<Blob | null> {
+    try {
+      const res = await fetch("/api/fill-form", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ fileUrl, fileName }),
+      });
+      if (!res.ok) throw new Error(await res.text());
+      const total = Number(res.headers.get("X-Fields-Total") ?? 0);
+      const matched = Number(res.headers.get("X-Fields-Matched") ?? 0);
+      setFillStats({ total, matched });
+      return await res.blob();
+    } catch (e) {
+      console.warn("에이전트 B 채우기 실패, 원본 양식으로 폴백:", e);
+      setFillStats(null);
+      return null;
+    }
+  }
+
   async function handleFormUpload(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
     if (!file) return;
     setUploadingForm(true);
     setError(null);
     try {
-      // 빈 양식 업로드 → 에이전트 B가 필드/빈칸을 파악하고, 매칭 로직이 초안을 채운다 (연동 대기 중).
-      // 지금은 화면 확인을 위해 업로드 성공 여부와 무관하게 바로 초안 화면으로 진행한다.
-      if (isFirebaseConfigured) {
-        const url = await uploadDocumentFile(file);
-        setFormFileUrl(url);
+      if (!isFirebaseConfigured) {
+        setFormName(file.name);
+        setFormFile(file);
+        setInitialHtml(null);
+        setDraftId(null);
+        setStarted(true);
+        return;
       }
+      const url = await uploadDocumentFile(file);
+      setFormFileUrl(url);
+      const filled = await fillFormViaAgentB(url, file.name);
       setFormName(file.name);
-      setFormFile(file);
+      setFormFile(filled ?? file);
       setInitialHtml(null);
       setDraftId(null);
       setStarted(true);
@@ -124,11 +151,15 @@ export default function ResumePreviewPage() {
   async function loadSampleForm() {
     setError(null);
     try {
-      const res = await fetch("/samples/sample-form.docx");
-      const blob = await res.blob();
+      const absoluteUrl = `${window.location.origin}/samples/sample-form.docx`;
+      const filled = await fillFormViaAgentB(
+        absoluteUrl,
+        "(샘플) 2026년 ICT인턴십 지원서류.docx"
+      );
+      const raw = filled ?? (await (await fetch(absoluteUrl)).blob());
       setFormName("(샘플) 2026년 ICT인턴십 지원서류.docx");
-      setFormFile(blob);
-      setFormFileUrl("/samples/sample-form.docx");
+      setFormFile(raw);
+      setFormFileUrl(absoluteUrl);
       setInitialHtml(null);
       setDraftId(null);
       setStarted(true);
@@ -262,7 +293,9 @@ export default function ResumePreviewPage() {
             이력서 양식을 업로드해서 이력서 작성을 시작하세요!
           </span>
           <span className="text-sm text-neutral-500">
-            {uploadingForm ? "업로드 중..." : "어떤 양식이든 올려주세요 (DOCX 등)"}
+            {uploadingForm
+              ? "업로드 및 자동 채우기 중... (최대 30초 정도 걸려요)"
+              : "어떤 양식이든 올려주세요 (DOCX 등)"}
           </span>
           <input
             ref={fileInputRef}
@@ -312,6 +345,13 @@ export default function ResumePreviewPage() {
       {error && (
         <div className="mb-4 rounded-md border border-red-300 bg-red-50 px-4 py-2 text-sm text-red-700">
           {error}
+        </div>
+      )}
+
+      {fillStats && (
+        <div className="mb-4 rounded-md border border-blue-200 bg-blue-50 px-4 py-2 text-sm text-blue-800">
+          감지된 필드 {fillStats.total}개 중 <strong>{fillStats.matched}개</strong> 자동으로
+          채웠어요. 나머지는 직접 입력해주세요.
         </div>
       )}
 

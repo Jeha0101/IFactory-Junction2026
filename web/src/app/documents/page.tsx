@@ -25,6 +25,7 @@ export default function DocumentsPage() {
   async function refresh() {
     const docs = await listDocuments();
     setDocuments(docs);
+    return docs;
   }
 
   useEffect(() => {
@@ -37,6 +38,15 @@ export default function DocumentsPage() {
       .finally(() => setLoading(false));
   }, []);
 
+  // 에이전트 A가 처리 중인 문서가 있으면 4초마다 상태를 다시 불러온다 (실행에 20~30초 정도 걸림).
+  useEffect(() => {
+    if (!documents.some((d) => d.status === "processing")) return;
+    const timer = setInterval(() => {
+      refresh().catch(() => {});
+    }, 4000);
+    return () => clearInterval(timer);
+  }, [documents]);
+
   async function handleFileSelected(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -45,7 +55,7 @@ export default function DocumentsPage() {
     try {
       const fileUrl = await uploadDocumentFile(file);
       // 분류·취득일·만료일은 사용자가 정하지 않는다 — 업로드 후 에이전트 A(Classify+Extract)가 채운다.
-      await addDocumentRecord({
+      const docId = await addDocumentRecord({
         fileName: file.name,
         fileUrl,
         status: "processing",
@@ -56,6 +66,8 @@ export default function DocumentsPage() {
         uploadedAt: new Date().toISOString(),
       });
       await refresh();
+      // 에이전트 A 실행은 20~30초 정도 걸려서 업로드 응답을 막지 않고 백그라운드로 트리거만 한다.
+      fetch(`/api/documents/${docId}/process`, { method: "POST" }).catch(() => {});
     } catch (e) {
       setError(String(e));
     } finally {

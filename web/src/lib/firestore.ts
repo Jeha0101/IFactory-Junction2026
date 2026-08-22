@@ -40,6 +40,19 @@ export async function saveProfile(profile: Profile): Promise<void> {
   await setDoc(userDocRef(), { profile }, { merge: true });
 }
 
+// ---------- Raw extract (에이전트 A/B 공용 영어 canonicalKey 어휘, 매칭용) ----------
+// profile(한글 키, 표시용)과 별개로 에이전트가 실제 쓰는 영어 키 값을 그대로 보관해서,
+// 에이전트 B의 canonicalKey와 번역 없이 바로 매칭할 수 있게 한다. (Agent_요구사항명세서.md §4)
+export async function getRawExtract(): Promise<Record<string, unknown> | null> {
+  const snap = await getDoc(userDocRef());
+  if (!snap.exists()) return null;
+  return (snap.data()?.rawExtract as Record<string, unknown>) ?? null;
+}
+
+export async function saveRawExtract(patch: Record<string, unknown>): Promise<void> {
+  await setDoc(userDocRef(), { rawExtract: patch }, { merge: true });
+}
+
 // ---------- Experiences (기능7) ----------
 export async function listExperiences(): Promise<Experience[]> {
   const snap = await getDocs(experiencesCol());
@@ -68,6 +81,19 @@ export async function listDocuments(): Promise<DocumentRecord[]> {
 export async function addDocumentRecord(docRecord: Omit<DocumentRecord, "id">): Promise<string> {
   const ref = await addDoc(documentsCol(), docRecord);
   return ref.id;
+}
+
+export async function getDocumentRecord(id: string): Promise<DocumentRecord | null> {
+  const snap = await getDoc(doc(documentsCol(), id));
+  if (!snap.exists()) return null;
+  return { id: snap.id, ...(snap.data() as Omit<DocumentRecord, "id">) };
+}
+
+export async function updateDocumentRecord(
+  id: string,
+  patch: Partial<Omit<DocumentRecord, "id">>
+): Promise<void> {
+  await updateDoc(doc(documentsCol(), id), patch);
 }
 
 export async function deleteDocumentRecord(id: string): Promise<void> {
