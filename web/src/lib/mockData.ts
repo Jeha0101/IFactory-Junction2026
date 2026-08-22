@@ -75,9 +75,3 @@ export const MOCK_COVER_LETTER_ANSWERS: Omit<CoverLetterAnswer, "id">[] = [
     fileUrl: "#",
   },
 ];
-
-// 실제로는 업로드한 빈 양식(에이전트 B)에서 질문이 추출되지만, 연동 전까지는 데모용으로 고정한다.
-export const MOCK_ESSAY_QUESTIONS = [
-  "협력 경험에 대해서 설명하세요.",
-  "지원 동기를 작성해주세요.",
-];

@@ -3,27 +3,21 @@
 import { useEffect, useRef, useState } from "react";
 import FirebaseNotice from "@/components/FirebaseNotice";
 import EssayQuestionBlock from "@/components/EssayQuestionBlock";
-import DocxLivePreview, { DocxLivePreviewHandle } from "@/components/DocxLivePreview";
+import DocxLivePreview from "@/components/DocxLivePreview";
 import { isFirebaseConfigured } from "@/lib/firebase";
 import {
   addCoverLetterAnswer,
   addExperience,
   createResumeDraft,
   getLatestResumeDraft,
-  getProfile,
-  listCoverLetterAnswers,
-  listExperiences,
   saveProfile,
   updateResumeDraft,
 } from "@/lib/firestore";
 import { uploadDocumentFile } from "@/lib/storage";
-import {
-  MOCK_COVER_LETTER_ANSWERS,
-  MOCK_ESSAY_QUESTIONS,
-  MOCK_EXPERIENCES,
-  MOCK_PROFILE,
-} from "@/lib/mockData";
-import type { CoverLetterAnswer, Experience, Profile, ResumeDraft } from "@/types";
+import { useAppData } from "@/lib/AppDataContext";
+import { MOCK_COVER_LETTER_ANSWERS, MOCK_EXPERIENCES, MOCK_PROFILE } from "@/lib/mockData";
+import type { Experience, Profile, ResumeDraft } from "@/types";
+import type { AnalyzedField } from "@/app/api/analyze-form/route";
 
 const TYPE_LABEL: Record<NonNullable<Experience["type"]>, string> = {
   project: "프로젝트",
@@ -48,25 +42,40 @@ export default function ResumePreviewPage() {
   const [started, setStarted] = useState(false);
   const [uploadingForm, setUploadingForm] = useState(false);
   const [formName, setFormName] = useState<string | null>(null);
-  const [formFile, setFormFile] = useState<File | Blob | null>(null);
   const [formFileUrl, setFormFileUrl] = useState<string | null>(null);
-  const [initialHtml, setInitialHtml] = useState<string | null>(null);
+  const [previewFile, setPreviewFile] = useState<Blob | null>(null); // render-docx가 만든 최종 결과물
   const [error, setError] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const previewRef = useRef<DocxLivePreviewHandle>(null);
 
-  const [profile, setProfile] = useState<Profile>(MOCK_PROFILE);
-  const [experiences, setExperiences] = useState<Experience[]>([]);
-  const [coverLetterAnswers, setCoverLetterAnswers] = useState<CoverLetterAnswer[]>([]);
+  // 전역 캐시(AppDataProvider)에서 가져온다 — 이 페이지가 따로 Firestore를 다시 읽지 않는다.
+  const cached = useAppData();
+  const profile: Profile =
+    isFirebaseConfigured && Object.keys(cached.profile).length > 0 ? cached.profile : MOCK_PROFILE;
+  const experiences =
+    isFirebaseConfigured && cached.experiences.length > 0
+      ? cached.experiences
+      : MOCK_EXPERIENCES.map((e, i) => ({ ...e, id: `mock-${i}` }));
+  const coverLetterAnswers =
+    isFirebaseConfigured && cached.coverLetterAnswers.length > 0
+      ? cached.coverLetterAnswers
+      : MOCK_COVER_LETTER_ANSWERS.map((a, i) => ({ ...a, id: `mock-${i}` }));
+
+  const [fields, setFields] = useState<AnalyzedField[]>([]);
+  const [fieldValues, setFieldValues] = useState<Record<string, string>>({});
+  const [analyzing, setAnalyzing] = useState(false);
+  const [rendering, setRendering] = useState(false);
+  const [fillStats, setFillStats] = useState<{
+    total: number;
+    matched: number;
+    rejected: number;
+  } | null>(null);
 
   const [existingDraft, setExistingDraft] = useState<ResumeDraft | null>(null);
   const [draftId, setDraftId] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [savedAt, setSavedAt] = useState<number | null>(null);
   const [downloading, setDownloading] = useState(false);
-  const [fillStats, setFillStats] = useState<{ total: number; matched: number } | null>(null);
 
-  // CTA 화면에서 "이어서 작성 중인 초안"이 있는지 미리 확인
   useEffect(() => {
     if (!isFirebaseConfigured) return;
     getLatestResumeDraft()
@@ -74,47 +83,79 @@ export default function ResumePreviewPage() {
       .catch(() => {});
   }, []);
 
-  useEffect(() => {
-    if (!started) return;
-    if (!isFirebaseConfigured) {
-      // Firebase 연결 전엔 목업 데이터로 화면을 바로 보여준다.
-      setExperiences(MOCK_EXPERIENCES.map((e, i) => ({ ...e, id: `mock-${i}` })));
-      setCoverLetterAnswers(MOCK_COVER_LETTER_ANSWERS.map((a, i) => ({ ...a, id: `mock-${i}` })));
-      return;
-    }
-    Promise.all([getProfile(), listExperiences(), listCoverLetterAnswers()])
-      .then(([p, exps, answers]) => {
-        setProfile(p && Object.keys(p).length > 0 ? p : MOCK_PROFILE);
-        setExperiences(
-          exps.length > 0 ? exps : MOCK_EXPERIENCES.map((e, i) => ({ ...e, id: `mock-${i}` }))
-        );
-        setCoverLetterAnswers(
-          answers.length > 0
-            ? answers
-            : MOCK_COVER_LETTER_ANSWERS.map((a, i) => ({ ...a, id: `mock-${i}` }))
-        );
-      })
-      .catch((e) => setError(String(e)));
-  }, [started]);
-
-  // 에이전트 B로 필드를 감지하고, 아카이빙된 값과 매칭해서 실제로 채운 docx를 받아온다.
-  // 실패하면(에이전트 미설정, 매칭 실패 등) 원본 빈 양식을 그대로 보여주는 걸로 조용히 폴백한다.
-  async function fillFormViaAgentB(fileUrl: string, fileName: string): Promise<Blob | null> {
+  async function analyzeAndRender(url: string, name: string, overrideValues?: Record<string, string>) {
+    setAnalyzing(true);
+    setError(null);
     try {
-      const res = await fetch("/api/fill-form", {
+      const res = await fetch("/api/analyze-form", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ fileUrl, fileName }),
+        body: JSON.stringify({ fileUrl: url, fileName: name }),
       });
-      if (!res.ok) throw new Error(await res.text());
-      const total = Number(res.headers.get("X-Fields-Total") ?? 0);
-      const matched = Number(res.headers.get("X-Fields-Matched") ?? 0);
-      setFillStats({ total, matched });
-      return await res.blob();
+      if (!res.ok) throw new Error((await res.json()).error ?? `분석 실패 (${res.status})`);
+      const data = await res.json();
+      const analyzed = data.fields as AnalyzedField[];
+      setFields(analyzed);
+      setFillStats({
+        total: data.totalFields,
+        matched: data.matchedFields,
+        rejected: data.rejectedFields,
+      });
+
+      const initialValues: Record<string, string> = {};
+      for (const f of analyzed) initialValues[f.id] = f.value;
+      const merged = { ...initialValues, ...overrideValues };
+      setFieldValues(merged);
+
+      await renderPreview(url, merged);
     } catch (e) {
-      console.warn("에이전트 B 채우기 실패, 원본 양식으로 폴백:", e);
-      setFillStats(null);
-      return null;
+      setError(String(e));
+    } finally {
+      setAnalyzing(false);
+    }
+  }
+
+  async function renderPreview(url: string, values: Record<string, string>) {
+    setRendering(true);
+    try {
+      const res = await fetch("/api/render-docx", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          fileUrl: url,
+          values: Object.entries(values).map(([id, value]) => ({ id, value })),
+        }),
+      });
+      if (!res.ok) throw new Error((await res.json()).error ?? `미리보기 생성 실패 (${res.status})`);
+      setPreviewFile(await res.blob());
+    } catch (e) {
+      setError(String(e));
+    } finally {
+      setRendering(false);
+    }
+  }
+
+  function updateFieldValue(id: string, value: string) {
+    setFieldValues((prev) => ({ ...prev, [id]: value }));
+  }
+
+  function refreshPreview() {
+    if (!formFileUrl) return;
+    renderPreview(formFileUrl, fieldValues);
+  }
+
+  async function startWithForm(url: string, name: string, overrideValues?: Record<string, string>) {
+    setFormFileUrl(url);
+    setFormName(name);
+    setDraftId(null);
+    setSavedAt(null);
+    setStarted(true);
+    if (isFirebaseConfigured) {
+      await analyzeAndRender(url, name, overrideValues);
+    } else {
+      // Firebase/에이전트 연결 전엔 원본 파일을 그대로 미리보기로 보여준다.
+      const blob = await (await fetch(url)).blob();
+      setPreviewFile(blob);
     }
   }
 
@@ -124,22 +165,8 @@ export default function ResumePreviewPage() {
     setUploadingForm(true);
     setError(null);
     try {
-      if (!isFirebaseConfigured) {
-        setFormName(file.name);
-        setFormFile(file);
-        setInitialHtml(null);
-        setDraftId(null);
-        setStarted(true);
-        return;
-      }
-      const url = await uploadDocumentFile(file);
-      setFormFileUrl(url);
-      const filled = await fillFormViaAgentB(url, file.name);
-      setFormName(file.name);
-      setFormFile(filled ?? file);
-      setInitialHtml(null);
-      setDraftId(null);
-      setStarted(true);
+      const url = isFirebaseConfigured ? await uploadDocumentFile(file) : URL.createObjectURL(file);
+      await startWithForm(url, file.name);
     } catch (e) {
       setError(String(e));
     } finally {
@@ -150,44 +177,19 @@ export default function ResumePreviewPage() {
 
   async function loadSampleForm() {
     setError(null);
-    try {
-      const absoluteUrl = `${window.location.origin}/samples/sample-form.docx`;
-      const filled = await fillFormViaAgentB(
-        absoluteUrl,
-        "(샘플) 2026년 ICT인턴십 지원서류.docx"
-      );
-      const raw = filled ?? (await (await fetch(absoluteUrl)).blob());
-      setFormName("(샘플) 2026년 ICT인턴십 지원서류.docx");
-      setFormFile(raw);
-      setFormFileUrl(absoluteUrl);
-      setInitialHtml(null);
-      setDraftId(null);
-      setStarted(true);
-    } catch (e) {
-      setError(String(e));
-    }
+    const absoluteUrl = `${window.location.origin}/samples/sample-form.docx`;
+    await startWithForm(absoluteUrl, "(샘플) 2026년 ICT인턴십 지원서류.docx");
   }
 
   async function continueDraft() {
     if (!existingDraft) return;
     setError(null);
-    try {
-      const res = await fetch(existingDraft.formFileUrl);
-      const blob = await res.blob();
-      setFormName(existingDraft.formFileName);
-      setFormFile(blob);
-      setFormFileUrl(existingDraft.formFileUrl);
-      setInitialHtml(existingDraft.editedHtml);
-      setDraftId(existingDraft.id);
-      setStarted(true);
-    } catch (e) {
-      setError(String(e));
-    }
+    await startWithForm(existingDraft.formFileUrl, existingDraft.formFileName, existingDraft.fieldValues);
+    setDraftId(existingDraft.id);
   }
 
   async function seedDummyData() {
     if (!isFirebaseConfigured) {
-      // Firebase 연결 전엔 그냥 로컬 목업으로 바로 진행 (useEffect가 폴백을 채워줌)
       setStarted(true);
       return;
     }
@@ -206,15 +208,14 @@ export default function ResumePreviewPage() {
     setSaving(true);
     setError(null);
     try {
-      const html = previewRef.current?.getHtml() ?? "";
       const now = new Date().toISOString();
       if (draftId) {
-        await updateResumeDraft(draftId, { editedHtml: html, updatedAt: now });
+        await updateResumeDraft(draftId, { fieldValues, updatedAt: now });
       } else {
         const id = await createResumeDraft({
           formFileName: formName ?? "이력서",
           formFileUrl,
-          editedHtml: html,
+          fieldValues,
           createdAt: now,
           updatedAt: now,
         });
@@ -229,19 +230,19 @@ export default function ResumePreviewPage() {
   }
 
   async function handleDownload() {
+    if (!formFileUrl) return;
     setDownloading(true);
     setError(null);
     try {
-      const html = previewRef.current?.getHtml() ?? "";
-      const res = await fetch("/api/export-docx", {
+      const res = await fetch("/api/render-docx", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ html, fileName: formName?.replace(/\.(docx|hwp)$/i, "") }),
+        body: JSON.stringify({
+          fileUrl: formFileUrl,
+          values: Object.entries(fieldValues).map(([id, value]) => ({ id, value })),
+        }),
       });
-      if (!res.ok) {
-        const body = await res.json().catch(() => ({}));
-        throw new Error(body.error || `다운로드 실패 (${res.status})`);
-      }
+      if (!res.ok) throw new Error((await res.json()).error ?? `다운로드 실패 (${res.status})`);
       const blob = await res.blob();
       const url = URL.createObjectURL(blob);
       const a = document.createElement("a");
@@ -293,9 +294,7 @@ export default function ResumePreviewPage() {
             이력서 양식을 업로드해서 이력서 작성을 시작하세요!
           </span>
           <span className="text-sm text-neutral-500">
-            {uploadingForm
-              ? "업로드 및 자동 채우기 중... (최대 30초 정도 걸려요)"
-              : "어떤 양식이든 올려주세요 (DOCX 등)"}
+            {uploadingForm ? "업로드 중..." : "어떤 양식이든 올려주세요 (DOCX 등)"}
           </span>
           <input
             ref={fileInputRef}
@@ -325,6 +324,9 @@ export default function ResumePreviewPage() {
     );
   }
 
+  const scalarFields = fields.filter((f) => !f.isEssay && !f.isRepeatable);
+  const essayFields = fields.filter((f) => f.isEssay);
+
   return (
     <div>
       <div className="mb-6 flex items-center justify-between">
@@ -343,27 +345,45 @@ export default function ResumePreviewPage() {
       </div>
 
       {error && (
-        <div className="mb-4 rounded-md border border-red-300 bg-red-50 px-4 py-2 text-sm text-red-700">
-          {error}
+        <div className="mb-4 flex items-center justify-between rounded-md border border-red-300 bg-red-50 px-4 py-2 text-sm text-red-700">
+          <span>{error}</span>
+          {formFileUrl && formName && (
+            <button
+              onClick={() => analyzeAndRender(formFileUrl, formName, fieldValues)}
+              className="ml-4 shrink-0 rounded-md border border-red-300 px-3 py-1 text-xs text-red-700 hover:bg-red-100"
+            >
+              다시 시도
+            </button>
+          )}
+        </div>
+      )}
+
+      {analyzing && (
+        <div className="mb-4 rounded-md border border-blue-200 bg-blue-50 px-4 py-2 text-sm text-blue-800">
+          양식을 분석하고 아카이빙된 정보로 채우는 중이에요... (최대 30초 정도 걸려요)
         </div>
       )}
 
       {fillStats && (
         <div className="mb-4 rounded-md border border-blue-200 bg-blue-50 px-4 py-2 text-sm text-blue-800">
           감지된 필드 {fillStats.total}개 중 <strong>{fillStats.matched}개</strong> 자동으로
-          채웠어요. 나머지는 직접 입력해주세요.
+          채웠어요.
+          {fillStats.rejected > 0 && (
+            <> ({fillStats.rejected}개는 라벨이 안 맞는 것 같아 안전하게 비워뒀어요.)</>
+          )}{" "}
+          나머지는 아래에서 직접 입력해주세요.
         </div>
       )}
 
-      <section className="mb-8">
-        <div className="mb-3 flex items-center justify-between">
-          <h2 className="font-semibold">최종 문서 미리보기</h2>
-          {formFile && (
+      {previewFile && (
+        <section className="mb-8">
+          <div className="mb-3 flex items-center justify-between">
+            <h2 className="font-semibold">최종 문서 미리보기</h2>
             <div className="flex items-center gap-2">
               {savedAt && <span className="text-xs text-green-700">저장됨</span>}
               <button
                 onClick={handleSaveDraft}
-                disabled={saving || !isFirebaseConfigured || !formFileUrl}
+                disabled={saving || !isFirebaseConfigured}
                 className="rounded-md border border-neutral-300 px-3 py-1.5 text-xs text-neutral-700 hover:bg-neutral-50 disabled:opacity-40"
               >
                 {saving ? "저장 중..." : "저장"}
@@ -376,26 +396,44 @@ export default function ResumePreviewPage() {
                 {downloading ? "변환 중..." : "다운로드 (.docx)"}
               </button>
             </div>
-          )}
-        </div>
-        {formFile ? (
-          <DocxLivePreview ref={previewRef} file={formFile} initialHtml={initialHtml} />
-        ) : (
-          <>
-            <p className="mb-3 text-xs text-neutral-500">
-              업로드된 원본 파일이 없어 필드 목록으로 대신 보여드립니다.
-            </p>
-            <dl className="grid gap-4 rounded-lg border border-neutral-200 bg-white p-4 sm:grid-cols-2">
-              {PROFILE_FIELDS.map(({ key, label }) => (
-                <div key={key}>
-                  <dt className="text-xs font-medium text-neutral-500">{label}</dt>
-                  <dd className="text-sm text-neutral-900">{profile[key] || "-"}</dd>
-                </div>
-              ))}
-            </dl>
-          </>
-        )}
-      </section>
+          </div>
+          <DocxLivePreview file={previewFile} />
+        </section>
+      )}
+
+      {scalarFields.length > 0 && (
+        <section className="mb-8">
+          <div className="mb-3 flex items-center justify-between">
+            <h2 className="font-semibold">감지된 필드 (수정하면 미리보기에 반영돼요)</h2>
+            <button
+              onClick={refreshPreview}
+              disabled={rendering}
+              className="rounded-md border border-neutral-300 px-3 py-1.5 text-xs text-neutral-700 hover:bg-neutral-50 disabled:opacity-40"
+            >
+              {rendering ? "반영 중..." : "미리보기 새로고침"}
+            </button>
+          </div>
+          <div className="grid gap-4 rounded-lg border border-neutral-200 bg-white p-4 sm:grid-cols-2">
+            {scalarFields.map((f, i) => (
+              // ⚠️ 같은 셀을 가리키는 필드가 2개 이상 나올 수 있음(예: 평균학점/총학점이 원래
+              // "0.0점 / 4.5점" 한 칸에 같이 있던 경우) — 이땐 id가 겹쳐서 같은 값을 공유하게
+              // 된다. React key 충돌만 막고, 값이 겹치는 건 알려진 제한사항으로 남겨둠
+              // (QA_수정요구사항.md 참고).
+              <label key={`${f.id}-${i}`} className="flex flex-col gap-1 text-sm">
+                <span className="font-medium text-neutral-700">{f.rawLabel}</span>
+                <input
+                  type="text"
+                  data-field-id={f.id}
+                  value={fieldValues[f.id] ?? ""}
+                  onChange={(e) => updateFieldValue(f.id, e.target.value)}
+                  onBlur={refreshPreview}
+                  className="rounded-md border border-neutral-300 px-3 py-2 focus:border-neutral-500 focus:outline-none"
+                />
+              </label>
+            ))}
+          </div>
+        </section>
+      )}
 
       <section className="mb-8">
         <h2 className="mb-3 font-semibold">경력/경험</h2>
@@ -415,14 +453,51 @@ export default function ResumePreviewPage() {
             </li>
           ))}
         </ul>
+        {fields.some((f) => f.isRepeatable) && (
+          <p className="mt-2 text-xs text-neutral-400">
+            (경력/경험을 문서의 반복 표(프로젝트 경험 등)에 자동으로 나눠 넣는 기능은 아직
+            준비 중이에요 — 지금은 위 목록으로만 확인 가능합니다.)
+          </p>
+        )}
       </section>
 
-      <section className="mb-8 space-y-4">
-        <h2 className="font-semibold">자기소개서 문항</h2>
-        {MOCK_ESSAY_QUESTIONS.map((q) => (
-          <EssayQuestionBlock key={q} question={q} allAnswers={coverLetterAnswers} />
-        ))}
-      </section>
+      {essayFields.length > 0 && (
+        <section className="mb-8 space-y-4">
+          <div className="flex items-center justify-between">
+            <h2 className="font-semibold">자기소개서 문항</h2>
+            <button
+              onClick={refreshPreview}
+              disabled={rendering}
+              className="rounded-md border border-neutral-300 px-3 py-1.5 text-xs text-neutral-700 hover:bg-neutral-50 disabled:opacity-40"
+            >
+              {rendering ? "반영 중..." : "미리보기 새로고침"}
+            </button>
+          </div>
+          {essayFields.map((f) => (
+            <EssayQuestionBlock
+              key={f.id}
+              question={f.rawLabel}
+              allAnswers={coverLetterAnswers}
+              value={fieldValues[f.id] ?? ""}
+              onChange={(v) => updateFieldValue(f.id, v)}
+            />
+          ))}
+        </section>
+      )}
+
+      {!isFirebaseConfigured && (
+        <section className="mb-8">
+          <h2 className="mb-3 font-semibold">기본 정보 (참고용)</h2>
+          <dl className="grid gap-4 rounded-lg border border-neutral-200 bg-white p-4 sm:grid-cols-2">
+            {PROFILE_FIELDS.map(({ key, label }) => (
+              <div key={key}>
+                <dt className="text-xs font-medium text-neutral-500">{label}</dt>
+                <dd className="text-sm text-neutral-900">{profile[key] || "-"}</dd>
+              </div>
+            ))}
+          </dl>
+        </section>
+      )}
     </div>
   );
 }

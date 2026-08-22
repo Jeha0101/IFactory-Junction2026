@@ -36,7 +36,17 @@ export async function uploadFileToUpstage(
   return data.id as string;
 }
 
-export async function createAgentJob(agentId: string, fileId: string): Promise<string> {
+export async function createAgentJob(
+  agentId: string,
+  fileId: string,
+  additionalText?: string
+): Promise<string> {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const content: any[] = [{ type: "input_file", file_id: fileId }];
+  if (additionalText) {
+    content.push({ type: "input_text", text: additionalText });
+  }
+
   const res = await fetch(`${BASE_URL}/responses`, {
     method: "POST",
     headers: {
@@ -45,12 +55,7 @@ export async function createAgentJob(agentId: string, fileId: string): Promise<s
     },
     body: JSON.stringify({
       model: agentId,
-      input: [
-        {
-          role: "user",
-          content: [{ type: "input_file", file_id: fileId }],
-        },
-      ],
+      input: [{ role: "user", content }],
     }),
   });
   if (!res.ok) {
@@ -85,11 +90,22 @@ export async function pollJob(
   throw new Error("Upstage Job 폴링 타임아웃 (90초 초과)");
 }
 
+/** 에이전트가 JSON이 아니라 평범한 문장으로 응답했을 때 (예: "정보가 부족합니다.") 던지는 에러.
+ * 문서 처리/폼 분석 쪽에서 이 에러를 잡아서 "다시 시도해주세요" 같은 안내로 바꿔 보여줄 수 있다. */
+export class AgentNonJsonResponseError extends Error {
+  constructor(public readonly rawText: string) {
+    super(`에이전트가 예상한 형식(JSON)으로 응답하지 않았습니다: "${rawText.slice(0, 200)}"`);
+    this.name = "AgentNonJsonResponseError";
+  }
+}
+
 /**
- * 에이전트 응답 텍스트를 JSON으로 파싱한다. 두 가지 잡음을 처리한다:
+ * 에이전트 응답 텍스트를 JSON으로 파싱한다. 세 가지 경우를 처리한다:
  * 1. 코드펜스(```json ... ```)로 감싸져 오는 경우
  * 2. 이따금 응답 전체가 JSON 문자열로 한 번 더 감싸져 오는 경우(이중 인코딩) — 이걸 못 벗기면
  *    배열 대신 문자열 하나로 파싱되어 버린다 (실제로 발생 확인됨, 2026-08-23)
+ * 3. **가끔 JSON이 아니라 "정보가 부족합니다." 같은 평범한 문장으로 응답하는 경우** (실제 발생
+ *    확인됨) — 이땐 JSON.parse가 애매한 SyntaxError를 던지는 대신, 명확한 전용 에러로 바꾼다.
  */
 export function parseAgentJson(text: string): unknown {
   let candidate = text.trim();
@@ -106,7 +122,11 @@ export function parseAgentJson(text: string): unknown {
     .replace(/^```json\s*/i, "")
     .replace(/```$/, "")
     .trim();
-  return JSON.parse(stripped);
+  try {
+    return JSON.parse(stripped);
+  } catch {
+    throw new AgentNonJsonResponseError(stripped);
+  }
 }
 
 /** 에이전트 실행 결과의 마지막 output 항목 텍스트를 꺼낸다. */
@@ -117,14 +137,17 @@ export function getLastOutputText(job: any): string {
   return last?.content?.[0]?.text ?? "";
 }
 
-/** 파일을 업로드하고 에이전트를 실행해서 마지막 output의 파싱된 JSON을 반환하는 편의 함수. */
+/** 파일을 업로드하고 에이전트를 실행해서 마지막 output의 파싱된 JSON을 반환하는 편의 함수.
+ * additionalText를 주면 파일과 함께 텍스트 컨텍스트로 같이 보낸다 — 에이전트 B가 python-docx
+ * 전처리 구조 JSON을 요구하는 경우(Agent_요구사항명세서.md §3 "왜 전처리가 필요한가" 참고)에 씀. */
 export async function runAgentOnFile(
   agentId: string,
   buffer: Buffer,
-  filename: string
+  filename: string,
+  additionalText?: string
 ): Promise<unknown> {
   const fileId = await uploadFileToUpstage(buffer, filename);
-  const jobId = await createAgentJob(agentId, fileId);
+  const jobId = await createAgentJob(agentId, fileId, additionalText);
   const job = await pollJob(jobId);
   if (job.status !== "completed") {
     throw new Error(`Upstage Job 실패: ${JSON.stringify(job.error)}`);

@@ -9,6 +9,7 @@ import {
   setDoc,
   query,
   orderBy,
+  where,
 } from "firebase/firestore";
 import { db } from "./firebase";
 import { DEMO_USER_ID } from "./demoUser";
@@ -72,6 +73,14 @@ export async function deleteExperience(id: string): Promise<void> {
   await deleteDoc(doc(experiencesCol(), id));
 }
 
+/** 문서 재처리 시 중복 저장을 막기 위해, 같은 출처 문서에서 이미 저장된 경력을 먼저 지운다. */
+export async function deleteExperiencesBySource(sourceDocumentId: string): Promise<void> {
+  const snap = await getDocs(
+    query(experiencesCol(), where("sourceDocumentId", "==", sourceDocumentId))
+  );
+  await Promise.all(snap.docs.map((d) => deleteDoc(d.ref)));
+}
+
 // ---------- Documents (기능3·4) ----------
 export async function listDocuments(): Promise<DocumentRecord[]> {
   const snap = await getDocs(query(documentsCol(), orderBy("uploadedAt", "desc")));
@@ -111,6 +120,14 @@ export async function addCoverLetterAnswer(
 ): Promise<string> {
   const ref = await addDoc(coverLetterAnswersCol(), answer);
   return ref.id;
+}
+
+/** 문서 재처리 시 중복 저장을 막기 위해, 같은 출처 문서에서 이미 저장된 답변을 먼저 지운다. */
+export async function deleteCoverLetterAnswersBySource(sourceDocumentId: string): Promise<void> {
+  const snap = await getDocs(
+    query(coverLetterAnswersCol(), where("sourceDocumentId", "==", sourceDocumentId))
+  );
+  await Promise.all(snap.docs.map((d) => deleteDoc(d.ref)));
 }
 
 // ---------- Resume drafts (작업 중간 저장) ----------

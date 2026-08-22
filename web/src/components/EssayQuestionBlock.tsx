@@ -1,17 +1,19 @@
 "use client";
 
-import { useState } from "react";
 import { rankSimilarAnswers } from "@/lib/matchQuestions";
 import type { CoverLetterAnswer } from "@/types";
 
 export default function EssayQuestionBlock({
   question,
   allAnswers,
+  value,
+  onChange,
 }: {
   question: string;
   allAnswers: CoverLetterAnswer[];
+  value: string;
+  onChange: (value: string) => void;
 }) {
-  const [value, setValue] = useState("");
   const candidates = rankSimilarAnswers(question, allAnswers, 3);
 
   return (
@@ -20,7 +22,7 @@ export default function EssayQuestionBlock({
 
       <textarea
         value={value}
-        onChange={(e) => setValue(e.target.value)}
+        onChange={(e) => onChange(e.target.value)}
         placeholder="(해당 항목에 대해 작성하세요)"
         rows={4}
         className="w-full rounded-md border border-neutral-300 px-3 py-2 text-sm focus:border-neutral-500 focus:outline-none"
@@ -56,7 +58,7 @@ export default function EssayQuestionBlock({
                   <span className="font-medium">A</span> {c.answerText}
                 </p>
                 <button
-                  onClick={() => setValue(c.answerText)}
+                  onClick={() => onChange(c.answerText)}
                   className="mt-2 text-sm font-medium text-neutral-900 hover:underline"
                 >
                   → 삽입하기

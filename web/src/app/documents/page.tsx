@@ -1,11 +1,11 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useRef, useState } from "react";
 import FirebaseNotice from "@/components/FirebaseNotice";
 import { isFirebaseConfigured } from "@/lib/firebase";
-import { addDocumentRecord, deleteDocumentRecord, listDocuments } from "@/lib/firestore";
+import { addDocumentRecord, deleteDocumentRecord, updateDocumentRecord } from "@/lib/firestore";
 import { uploadDocumentFile } from "@/lib/storage";
-import type { DocumentRecord } from "@/types";
+import { useAppData } from "@/lib/AppDataContext";
 
 const EXPIRY_WARNING_DAYS = 30;
 
@@ -16,69 +16,62 @@ function daysUntil(dateStr?: string | null): number | null {
 }
 
 export default function DocumentsPage() {
-  const [documents, setDocuments] = useState<DocumentRecord[]>([]);
-  const [loading, setLoading] = useState(true);
+  const { documents, loading } = useAppData();
   const [uploading, setUploading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [dragOver, setDragOver] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  async function refresh() {
-    const docs = await listDocuments();
-    setDocuments(docs);
-    return docs;
-  }
-
-  useEffect(() => {
-    if (!isFirebaseConfigured) {
-      setLoading(false);
-      return;
-    }
-    refresh()
-      .catch((e) => setError(String(e)))
-      .finally(() => setLoading(false));
-  }, []);
-
-  // 에이전트 A가 처리 중인 문서가 있으면 4초마다 상태를 다시 불러온다 (실행에 20~30초 정도 걸림).
-  useEffect(() => {
-    if (!documents.some((d) => d.status === "processing")) return;
-    const timer = setInterval(() => {
-      refresh().catch(() => {});
-    }, 4000);
-    return () => clearInterval(timer);
-  }, [documents]);
-
-  async function handleFileSelected(e: React.ChangeEvent<HTMLInputElement>) {
-    const file = e.target.files?.[0];
-    if (!file) return;
+  // 여러 파일을 한 번에 올릴 수 있지만, 에이전트 처리를 동시에 여러 개 돌리면 에러가 날 수 있어
+  // 순차 처리한다 (QA_수정요구사항.md §2-2).
+  async function uploadFiles(files: File[]) {
     setUploading(true);
     setError(null);
     try {
-      const fileUrl = await uploadDocumentFile(file);
-      // 분류·취득일·만료일은 사용자가 정하지 않는다 — 업로드 후 에이전트 A(Classify+Extract)가 채운다.
-      const docId = await addDocumentRecord({
-        fileName: file.name,
-        fileUrl,
-        status: "processing",
-        category: null,
-        acquiredAt: null,
-        expiresAt: null,
-        linkedExperienceId: null,
-        uploadedAt: new Date().toISOString(),
-      });
-      await refresh();
-      // 에이전트 A 실행은 20~30초 정도 걸려서 업로드 응답을 막지 않고 백그라운드로 트리거만 한다.
-      fetch(`/api/documents/${docId}/process`, { method: "POST" }).catch(() => {});
+      for (const file of files) {
+        const fileUrl = await uploadDocumentFile(file);
+        const docId = await addDocumentRecord({
+          fileName: file.name,
+          fileUrl,
+          status: "processing",
+          category: null,
+          acquiredAt: null,
+          expiresAt: null,
+          linkedExperienceId: null,
+          uploadedAt: new Date().toISOString(),
+        });
+        // onSnapshot이 목록을 알아서 갱신해준다 — 여기서 따로 refresh할 필요 없음.
+        await fetch(`/api/documents/${docId}/process`, { method: "POST" }).catch(() => {});
+      }
     } catch (e) {
       setError(String(e));
     } finally {
       setUploading(false);
-      if (fileInputRef.current) fileInputRef.current.value = "";
     }
+  }
+
+  function handleFileSelected(e: React.ChangeEvent<HTMLInputElement>) {
+    const files = Array.from(e.target.files ?? []);
+    if (files.length === 0) return;
+    uploadFiles(files);
+    e.target.value = "";
+  }
+
+  function handleDrop(e: React.DragEvent<HTMLLabelElement>) {
+    e.preventDefault();
+    setDragOver(false);
+    if (!isFirebaseConfigured || uploading) return;
+    const files = Array.from(e.dataTransfer.files ?? []);
+    if (files.length > 0) uploadFiles(files);
   }
 
   async function handleDelete(id: string) {
     await deleteDocumentRecord(id);
-    await refresh();
+  }
+
+  async function retryProcessing(id: string) {
+    await updateDocumentRecord(id, { status: "processing", errorMessage: null });
+    await fetch(`/api/documents/${id}/process`, { method: "POST" }).catch(() => {});
   }
 
   return (
@@ -96,18 +89,25 @@ export default function DocumentsPage() {
       )}
 
       <label
-        className={`mb-8 flex flex-col items-center justify-center gap-2 rounded-lg border-2 border-dashed border-neutral-300 bg-white p-8 text-center transition hover:border-neutral-400 ${
-          !isFirebaseConfigured ? "pointer-events-none opacity-40" : "cursor-pointer"
-        }`}
+        onDragOver={(e) => {
+          e.preventDefault();
+          setDragOver(true);
+        }}
+        onDragLeave={() => setDragOver(false)}
+        onDrop={handleDrop}
+        className={`mb-8 flex flex-col items-center justify-center gap-2 rounded-lg border-2 border-dashed p-8 text-center transition ${
+          dragOver ? "border-neutral-500 bg-neutral-50" : "border-neutral-300 bg-white"
+        } ${!isFirebaseConfigured ? "pointer-events-none opacity-40" : "cursor-pointer hover:border-neutral-400"}`}
       >
         <span className="text-2xl">＋</span>
         <span className="font-medium">자료 추가하기</span>
         <span className="text-xs text-neutral-500">
-          {uploading ? "업로드 중..." : "클릭해서 파일 선택 (분류는 자동)"}
+          {uploading ? "업로드 중..." : "클릭하거나 파일을 끌어다 놓으세요 (여러 개 가능, 분류는 자동)"}
         </span>
         <input
           ref={fileInputRef}
           type="file"
+          multiple
           className="hidden"
           onChange={handleFileSelected}
           disabled={uploading || !isFirebaseConfigured}
@@ -165,6 +165,11 @@ export default function DocumentsPage() {
                       {remain}일 후 만료됩니다.
                     </p>
                   )}
+                  {d.status === "error" && (
+                    <p className="mt-1 max-w-md text-xs text-red-500">
+                      {d.errorMessage ?? "처리 중 문제가 발생했습니다."}
+                    </p>
+                  )}
                 </div>
                 <div className="flex items-center gap-3">
                   <a
@@ -175,6 +180,14 @@ export default function DocumentsPage() {
                   >
                     미리보기
                   </a>
+                  {d.status === "error" && (
+                    <button
+                      onClick={() => retryProcessing(d.id)}
+                      className="text-sm text-blue-600 hover:underline"
+                    >
+                      다시 시도
+                    </button>
+                  )}
                   <button
                     onClick={() => handleDelete(d.id)}
                     className="text-sm text-red-500 hover:underline"
