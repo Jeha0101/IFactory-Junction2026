@@ -5,9 +5,15 @@ import { isFirebaseConfigured } from "@/lib/firebase";
 import { addDocumentRecord, deleteDocumentRecord, updateDocumentRecord } from "@/lib/firestore";
 import { uploadDocumentFile } from "@/lib/storage";
 import { useAppData } from "@/lib/AppDataContext";
-import { Search, ChevronDown, FilePlus2 } from "lucide-react";
+import { Search, ChevronDown, FilePlus2, MoreHorizontal } from "lucide-react";
+import DocPreviewModal from "@/components/DocPreviewModal";
+import type { DocumentRecord } from "@/types";
 
 const EXPIRY_WARNING_DAYS = 30;
+
+function formatDate(dateStr: string): string {
+  return dateStr.replace(/-/g, ".");
+}
 
 function daysUntil(dateStr?: string | null): number | null {
   if (!dateStr) return null;
@@ -15,12 +21,16 @@ function daysUntil(dateStr?: string | null): number | null {
   return Math.ceil(diffMs / (1000 * 60 * 60 * 24));
 }
 
+// Figma "증빙자료 관리 탭"(node 130:6815) 이식 — 미리보기 버튼은 따로 없고 칸을 클릭하면 바로
+// 미리보기가 뜨고, 삭제는 "나의 이력서"와 같은 패턴으로 "..." 버튼을 눌러야 나온다.
 export default function DocumentsPage() {
   const { documents, loading } = useAppData();
   const [uploading, setUploading] = useState(false);
   const [search, setSearch] = useState("");
   const [sortAsc, setSortAsc] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [openMenuId, setOpenMenuId] = useState<string | null>(null);
+  const [previewDoc, setPreviewDoc] = useState<DocumentRecord | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   // 여러 파일을 한 번에 올릴 수 있지만, 에이전트 처리를 동시에 여러 개 돌리면 에러가 날 수 있어
@@ -59,10 +69,12 @@ export default function DocumentsPage() {
   }
 
   async function handleDelete(id: string) {
+    setOpenMenuId(null);
     await deleteDocumentRecord(id);
   }
 
   async function retryProcessing(id: string) {
+    setOpenMenuId(null);
     await updateDocumentRecord(id, { status: "processing", errorMessage: null });
     await fetch(`/api/documents/${id}/process`, { method: "POST" }).catch(() => {});
   }
@@ -80,6 +92,14 @@ export default function DocumentsPage() {
         <div className="mb-4 rounded-md border border-red-300 bg-red-50 px-4 py-2 text-sm text-red-700">
           {error}
         </div>
+      )}
+
+      {previewDoc && (
+        <DocPreviewModal
+          title={previewDoc.fileName}
+          source={{ kind: "file", fileUrl: previewDoc.fileUrl }}
+          onClose={() => setPreviewDoc(null)}
+        />
       )}
 
       <div className="mb-3 flex h-16 items-center justify-between rounded-xl bg-[#EFEFEF] px-5">
@@ -109,86 +129,87 @@ export default function DocumentsPage() {
           {search ? "검색 결과가 없습니다." : "아직 업로드한 서류가 없습니다."}
         </p>
       ) : (
-        <ul className="space-y-3">
+        <div className="flex flex-col gap-3">
           {sorted.map((d) => {
             const remain = daysUntil(d.expiresAt);
             const isExpiringSoon = remain !== null && remain <= EXPIRY_WARNING_DAYS;
-            const isExpired = remain !== null && remain < 0;
             return (
-              <li
+              <div
                 key={d.id}
-                className="flex items-center justify-between rounded-lg bg-white p-4"
+                onClick={() => setPreviewDoc(d)}
+                className="relative flex h-[122px] cursor-pointer items-center justify-between rounded-xl bg-white px-9 shadow-[0_2px_8px_rgba(0,0,0,0.02)] transition-shadow hover:shadow-md"
               >
-                <div>
+                <div className="min-w-0 flex-1">
                   <div className="flex items-center gap-2">
-                    {d.status === "processing" ? (
-                      <span className="rounded bg-blue-50 px-2 py-0.5 text-xs text-blue-600">
+                    {d.status === "processing" && (
+                      <span className="shrink-0 rounded bg-blue-50 px-2 py-0.5 text-xs text-blue-600">
                         분석 중...
                       </span>
-                    ) : d.category ? (
-                      <span className="rounded bg-neutral-100 px-2 py-0.5 text-xs text-neutral-600">
-                        {d.category}
-                      </span>
-                    ) : (
-                      <span className="rounded bg-red-50 px-2 py-0.5 text-xs text-red-600">
+                    )}
+                    {d.status === "error" && (
+                      <span className="shrink-0 rounded bg-red-50 px-2 py-0.5 text-xs text-red-600">
                         분류 실패
                       </span>
                     )}
-                    <a
-                      href={d.fileUrl}
-                      target="_blank"
-                      rel="noreferrer"
-                      className="font-medium hover:underline"
-                    >
-                      {d.fileName}
-                    </a>
+                    <p className="truncate text-[24px] font-bold text-[#333]">{d.fileName}</p>
                   </div>
-                  <div className="mt-1 text-xs text-neutral-500">
-                    {d.acquiredAt && <span>취득일 {d.acquiredAt} · </span>}
-                    {d.expiresAt && <span>만료일 {d.expiresAt}</span>}
-                  </div>
-                  {isExpired && (
-                    <p className="mt-1 text-xs font-medium text-red-600">만료되었습니다.</p>
-                  )}
-                  {!isExpired && isExpiringSoon && (
-                    <p className="mt-1 text-xs font-medium text-amber-600">
-                      {remain}일 후 만료됩니다.
-                    </p>
-                  )}
-                  {d.status === "error" && (
-                    <p className="mt-1 max-w-md text-xs text-red-500">
-                      {d.errorMessage ?? "처리 중 문제가 발생했습니다."}
-                    </p>
+                  <p className="mt-2 flex gap-2 text-[15px] text-[#B3B3B3]">
+                    <span>생성일자</span>
+                    <span>{formatDate(d.uploadedAt.slice(0, 10))}</span>
+                  </p>
+                  {d.status === "error" && d.errorMessage && (
+                    <p className="mt-1 max-w-md truncate text-xs text-red-500">{d.errorMessage}</p>
                   )}
                 </div>
-                <div className="flex items-center gap-3">
-                  <a
-                    href={d.fileUrl}
-                    target="_blank"
-                    rel="noreferrer"
-                    className="text-sm text-neutral-500 hover:underline"
+
+                {d.expiresAt && (
+                  <div
+                    className={`mr-4 flex shrink-0 items-center justify-center rounded px-2.5 py-1 text-[14px] ${
+                      isExpiringSoon
+                        ? "bg-[rgba(255,47,47,0.1)] text-[#FF2F2F]"
+                        : "bg-[#F0F0F0] text-[#707070]"
+                    }`}
                   >
-                    미리보기
-                  </a>
-                  {d.status === "error" && (
+                    <span className="font-bold">만료일 </span>
+                    <span>{formatDate(d.expiresAt)}</span>
+                  </div>
+                )}
+
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setOpenMenuId((id) => (id === d.id ? null : d.id));
+                  }}
+                  className="shrink-0 rounded-full p-2 text-[#7F7F7F] hover:bg-neutral-100"
+                >
+                  <MoreHorizontal size={24} />
+                </button>
+
+                {openMenuId === d.id && (
+                  <div
+                    onClick={(e) => e.stopPropagation()}
+                    className="absolute right-9 top-16 z-10 w-36 rounded-lg border border-neutral-200 bg-white py-1 shadow-lg"
+                  >
+                    {d.status === "error" && (
+                      <button
+                        onClick={() => retryProcessing(d.id)}
+                        className="block w-full px-4 py-2 text-left text-sm text-neutral-700 hover:bg-neutral-50"
+                      >
+                        다시 시도
+                      </button>
+                    )}
                     <button
-                      onClick={() => retryProcessing(d.id)}
-                      className="text-sm text-blue-600 hover:underline"
+                      onClick={() => handleDelete(d.id)}
+                      className="block w-full px-4 py-2 text-left text-sm text-red-600 hover:bg-red-50"
                     >
-                      다시 시도
+                      삭제
                     </button>
-                  )}
-                  <button
-                    onClick={() => handleDelete(d.id)}
-                    className="text-sm text-red-500 hover:underline"
-                  >
-                    삭제
-                  </button>
-                </div>
-              </li>
+                  </div>
+                )}
+              </div>
             );
           })}
-        </ul>
+        </div>
       )}
 
       {/* 우측 하단 "+" 버튼 = 자료 업로드 진입점(기존 드롭존 대체). 여러 개 선택 가능. */}

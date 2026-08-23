@@ -53,7 +53,7 @@ export default function WizardHeader({
         className={`flex h-[50px] w-[142px] items-center justify-center rounded-full bg-[#2D71F9] text-[18px] font-bold text-white ${confirmEnabled ? "hover:bg-[#215fdb]" : "opacity-50"
           }`}
       >
-        수정완료
+        {activeStep === 1 ? "다음으로" : "수정완료"}
       </button>
     </header>
   );

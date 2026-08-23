@@ -7,6 +7,8 @@ import { useAppData } from "@/lib/AppDataContext";
 import { deleteResumeDraft } from "@/lib/firestore";
 import { isFirebaseConfigured } from "@/lib/firebase";
 import FirebaseNotice from "@/components/FirebaseNotice";
+import DocPreviewModal from "@/components/DocPreviewModal";
+import type { ResumeDraft } from "@/types";
 
 function formatDate(iso: string): string {
   const d = new Date(iso);
@@ -21,6 +23,7 @@ export default function MyResumesPage() {
   const [search, setSearch] = useState("");
   const [sortAsc, setSortAsc] = useState(false);
   const [openMenuId, setOpenMenuId] = useState<string | null>(null);
+  const [previewDraft, setPreviewDraft] = useState<ResumeDraft | null>(null);
 
   const drafts = useMemo(() => {
     const filtered = search.trim()
@@ -46,6 +49,18 @@ export default function MyResumesPage() {
         Resup 에이전트로 만든 이력서를 모아서 보여드려요.
       </p> */}
       <FirebaseNotice />
+
+      {previewDraft && (
+        <DocPreviewModal
+          title={previewDraft.formFileName}
+          source={{
+            kind: "draft",
+            formFileUrl: previewDraft.formFileUrl,
+            fieldValues: previewDraft.fieldValues,
+          }}
+          onClose={() => setPreviewDraft(null)}
+        />
+      )}
 
       <div className="mb-3 flex h-16 items-center justify-between rounded-xl bg-[#EFEFEF] px-5">
         <input
@@ -86,22 +101,30 @@ export default function MyResumesPage() {
           {drafts.map((draft) => (
             <div
               key={draft.id}
-              className="relative flex h-[108px] items-center justify-between rounded-2xl bg-white px-8 shadow-[0_2px_8px_rgba(0,0,0,0.02)] transition-shadow hover:shadow-md"            >
-              <Link href={`/resume-preview?draft=${draft.id}`} className="flex-1">
-                <p className="text-[24px] font-bold text-[#333]">{draft.formFileName}</p>
+              onClick={() => setPreviewDraft(draft)}
+              className="relative flex h-[108px] cursor-pointer items-center justify-between rounded-2xl bg-white px-8 shadow-[0_2px_8px_rgba(0,0,0,0.02)] transition-shadow hover:shadow-md"
+            >
+              <div className="min-w-0 flex-1">
+                <p className="truncate text-[24px] font-bold text-[#333]">{draft.formFileName}</p>
                 <p className="mt-2 flex gap-2 text-[15px] text-[#B3B3B3]">
                   <span>생성일자</span>
                   <span>{formatDate(draft.createdAt)}</span>
                 </p>
-              </Link>
+              </div>
               <button
-                onClick={() => setOpenMenuId((id) => (id === draft.id ? null : draft.id))}
-                className="rounded-full p-2 text-[#7F7F7F] hover:bg-neutral-100"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setOpenMenuId((id) => (id === draft.id ? null : draft.id));
+                }}
+                className="shrink-0 rounded-full p-2 text-[#7F7F7F] hover:bg-neutral-100"
               >
                 <MoreHorizontal size={24} />
               </button>
               {openMenuId === draft.id && (
-                <div className="absolute right-9 top-16 z-10 w-36 rounded-lg border border-neutral-200 bg-white py-1 shadow-lg">
+                <div
+                  onClick={(e) => e.stopPropagation()}
+                  className="absolute right-9 top-16 z-10 w-36 rounded-lg border border-neutral-200 bg-white py-1 shadow-lg"
+                >
                   <Link
                     href={`/resume-preview?draft=${draft.id}`}
                     className="block px-4 py-2 text-sm text-neutral-700 hover:bg-neutral-50"
