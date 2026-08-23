@@ -6,7 +6,7 @@ import WizardHeader from "@/components/WizardHeader";
 export default function ParsingLoadingScreen({ onBack }: { onBack: () => void }) {
   return (
     <div className="fixed inset-0 z-40 flex flex-col bg-[#F0F1F1]">
-      <WizardHeader onBack={onBack} confirmEnabled={false} />
+      <WizardHeader activeStep={1} onBack={onBack} confirmEnabled={false} />
 
       <div className="flex flex-1 flex-col items-center justify-center gap-8">
         {/* 실제 문서 미리보기(node 130:6413, 586.7x830 ≈ A4 비율)와 같은 페이지 모양의

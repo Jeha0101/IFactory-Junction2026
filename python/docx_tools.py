@@ -92,45 +92,70 @@ def fill_values(input_path: str, values: list[dict], output_path: str) -> None:
 
     values: [{"table": int, "row": int, "mergedGroupIndex": int, "value": str, "rawLabel": str?}, ...]
 
-    ⚠️ 방어 로직 (2026-08-23 갱신): 에이전트 B가 cellRef.mergedGroupIndex를 값 칸이 아닌
-    엉뚱한 인덱스(라벨 칸이거나 그 이전 빈 칸)로 돌려주는 경우가 실제로 확인됨. 예전엔 "그 행의
-    마지막 그룹으로 보정"했는데, 이건 한 행에 라벨-값 쌍이 **하나뿐일 때만** 맞는 가정이었다.
-    실제 양식에는 "휴대폰/전화번호", "E-mail/SNS"처럼 **한 행에 라벨-값 쌍이 두 개 이상** 있는
-    경우가 흔한데, 이때 무조건 "마지막 그룹"으로 보내면 완전히 다른 필드(예: 이메일 값이 SNS
-    칸에 들어감)로 값이 새어버리는 걸 실측으로 확인함.
+    ⚠️ 에이전트 B의 cellRef는 신뢰할 수 없다는 게 실측으로 여러 번 확인됐다:
+    1) 라벨 칸이나 그 이전 빈 칸의 인덱스를 돌려주는 경우 (한 행에 라벨-값 쌍이 여러 개면
+       "마지막 그룹으로 보정"이 완전히 다른 필드를 오염시킴 — 2026-08-23 1차 수정)
+    2) **table/row 좌표 자체가 통째로 틀린 경우** — 예: "성명" 라벨의 실제 위치는 표1인데
+       cellRef가 표0(제목 행, 그룹이 1개뿐)을 가리켜서, 그 행엔 존재하지도 않는
+       mergedGroupIndex라 for 루프가 아예 방문을 안 하고 값이 통째로 증발함 (2026-08-23 2차
+       확인 — 실제 업로드 파일로 라이브 테스트하다 발견, 에러 없이 조용히 사라져서 더 위험함).
 
-    그래서 `rawLabel`이 주어지면, cellRef 인덱스를 신뢰하는 대신 **그 행 안에서 rawLabel과
-    텍스트가 일치하는 그룹을 직접 찾아 그 바로 다음 그룹**을 값 칸으로 쓴다 (라벨 바로 다음 칸이
-    값/힌트 칸이라는 표 구조 관례 그대로, 단 이번엔 라벨 자체를 텍스트로 특정해서 같은 행 안의
-    다른 라벨-값 쌍과 섞이지 않게 함). rawLabel이 없거나 행에서 못 찾으면 예전 방식(마지막 그룹)으로
-    폴백한다.
+    그래서 좌표는 참고용 힌트로만 쓰고, `rawLabel`이 있으면 **문서 전체**에서 그 라벨 텍스트와
+    일치하는 그룹을 찾아 바로 다음 그룹을 값 칸으로 쓰는 걸 최우선으로 한다(정확히 일치 → 그다음
+    부분 포함). 좌표 기반 보정은 라벨을 못 찾았을 때만 쓰는 최후의 폴백이다.
     """
     doc = Document(input_path)
-    value_map: dict[tuple[int, int, int], dict] = {
-        (v["table"], v["row"], v["mergedGroupIndex"]): v for v in values
-    }
 
+    all_rows: list[tuple[int, int, list]] = []
     for ti, table in enumerate(doc.tables):
         for ri, row in enumerate(table.rows):
-            groups = _merge_groups_with_cells(row)
-            last_index = len(groups) - 1
-            for gi, (cell, _text, _span) in enumerate(groups):
-                key = (ti, ri, gi)
-                if key not in value_map:
+            all_rows.append((ti, ri, _merge_groups_with_cells(row)))
+    rows_by_coord = {(ti, ri): groups for ti, ri, groups in all_rows}
+
+    def find_by_label(needle: str, exact: bool):
+        for _ti, _ri, groups in all_rows:
+            for label_idx, (_c, text, _s) in enumerate(groups):
+                norm = _normalize_label(text)
+                matched = norm == needle if exact else (needle and needle in norm)
+                if not matched:
                     continue
-                entry = value_map[key]
-                raw_label = entry.get("rawLabel")
-                target_cell = None
-                if raw_label:
-                    needle = _normalize_label(raw_label)
-                    for label_idx, (_c, text, _s) in enumerate(groups):
-                        if needle and needle in _normalize_label(text):
-                            value_idx = min(label_idx + 1, last_index)
-                            target_cell = groups[value_idx][0]
-                            break
-                if target_cell is None:
-                    target_cell = groups[last_index][0] if gi != last_index else cell
-                target_cell.text = entry["value"]
+                # ⚠️ 이 행에 라벨 말고 다른 칸이 없으면(표 전체 폭을 차지하는 섹션 제목 행,
+                # 예: "활동사항" colspan=7) "다음 칸"이 없다 — 그 경우 라벨 자신으로 되돌아가서
+                # 섹션 제목 자체를 덮어쓰게 된다(실측 확인, 2026-08-23). 그런 매치는 쓸 수
+                # 없으니 건너뛰고 다른 매치를 계속 찾는다.
+                if label_idx + 1 > len(groups) - 1:
+                    continue
+                return groups[label_idx + 1][0]
+        return None
+
+    for entry in values:
+        ti, ri, gi = entry["table"], entry["row"], entry["mergedGroupIndex"]
+        raw_label = entry.get("rawLabel")
+        target_cell = None
+        label_search_attempted = False
+
+        if raw_label:
+            needle = _normalize_label(raw_label)
+            if needle:
+                label_search_attempted = True
+                target_cell = find_by_label(needle, exact=True) or find_by_label(needle, exact=False)
+
+        # ⚠️ rawLabel을 줬는데 문서 어디서도 못 찾았다면, 활동사항/자격증 같은 반복형(표) 필드일
+        # 가능성이 높다 — 실측 확인: 에이전트 B가 "활동사항"이라는 요약 라벨을 주지만 문서엔
+        # "활동구분"/"활동 내용"처럼 실제 칼럼 헤더가 따로 있어 라벨 텍스트가 애초에 문서에
+        # 없고, 게다가 이때 준 좌표(table/row)도 성명 사례처럼 완전히 다른 표(예: 학력사항
+        # 표)를 가리켜서 틀렸다(2026-08-23 3차 확인). 이 경우 좌표 폴백을 쓰면 엉뚱한 표의
+        # 라벨/제목 칸에 값이 새어 들어간다 — 차라리 안 쓰는 게 안전하다("억지로 채우지
+        # 않는다" 원칙). 그래서 라벨 탐색을 "시도했는데 실패"한 경우엔 좌표 폴백을 건너뛰고,
+        # rawLabel 자체가 없었던(레거시) 경우에만 좌표 폴백을 쓴다.
+        if target_cell is None and not label_search_attempted:
+            groups = rows_by_coord.get((ti, ri))
+            if groups and 0 <= gi < len(groups):
+                last_index = len(groups) - 1
+                target_cell = groups[last_index][0] if gi != last_index else groups[gi][0]
+
+        if target_cell is not None:
+            target_cell.text = entry["value"]
 
     doc.save(output_path)
 

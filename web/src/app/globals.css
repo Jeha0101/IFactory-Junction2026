@@ -31,3 +31,19 @@ body {
   color: var(--foreground);
   font-family: var(--font-pretendard);
 }
+
+/* DocxLivePreview에서 문서 안 값 칸을 바로 클릭해서 고칠 수 있게 만든 셀 (contentEditable) —
+   fieldValues만 갱신하고 문서는 항상 python-docx가 다시 그린다, DocxLivePreview.tsx 참고. */
+.docx-editable-cell {
+  cursor: text;
+  outline: 1px dashed #2d71f9;
+  outline-offset: -1px;
+  background-color: rgba(45, 113, 249, 0.06);
+}
+.docx-editable-cell:hover {
+  background-color: rgba(45, 113, 249, 0.12);
+}
+.docx-editable-cell:focus {
+  background-color: rgba(45, 113, 249, 0.18);
+  outline-style: solid;
+}

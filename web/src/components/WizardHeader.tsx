@@ -2,17 +2,26 @@
 
 import { ChevronLeft, ChevronRight } from "lucide-react";
 
-// Figma의 이력서 작성 2단계 위저드 헤더(node 130:6305/130:6413에서 공통) — 전역 탭바를
-// 대신해서 뜬다. 2단계(내용 선택하기)는 아직 화면이 없어서 계속 비활성 상태로만 둠.
+// Figma의 이력서 작성 2단계 위저드 헤더(node 130:6305/130:6413/130:6448 공통) — 전역
+// 탭바를 대신해서 뜬다. activeStep에 따라 1/2 원형 번호와 라벨 강조가 바뀐다.
 export default function WizardHeader({
+  activeStep,
   onBack,
   confirmEnabled,
   onConfirm,
 }: {
+  activeStep: 1 | 2;
   onBack: () => void;
   confirmEnabled: boolean;
   onConfirm?: () => void;
 }) {
+  const stepStyle = (step: 1 | 2) =>
+    step === activeStep
+      ? { circle: "bg-[#2D71F9] text-white", label: "font-bold text-[#333]" }
+      : { circle: "bg-[#E3E3E3] text-[#8A8A8A]", label: "text-[#8A8A8A]" };
+  const s1 = stepStyle(1);
+  const s2 = stepStyle(2);
+
   return (
     <header className="flex h-[90px] shrink-0 items-center justify-between border-b border-[#EDEDED] bg-[#F8F8F8] px-9">
       <button
@@ -24,17 +33,17 @@ export default function WizardHeader({
 
       <div className="flex items-center gap-[50px]">
         <div className="flex items-center gap-[17px]">
-          <span className="flex size-9 items-center justify-center rounded-full bg-[#2D71F9] text-[18px] font-bold text-white">
+          <span className={`flex size-9 items-center justify-center rounded-full text-[18px] font-bold ${s1.circle}`}>
             1
           </span>
-          <span className="text-[18px] font-bold text-[#333]">정보 확인 후 수정하기</span>
+          <span className={`text-[18px] ${s1.label}`}>정보 확인 후 수정하기</span>
         </div>
         <ChevronRight size={20} className="text-neutral-300" />
         <div className="flex items-center gap-[17px]">
-          <span className="flex size-9 items-center justify-center rounded-full bg-[#E3E3E3] text-[18px] font-bold text-[#8A8A8A]">
+          <span className={`flex size-9 items-center justify-center rounded-full text-[18px] font-bold ${s2.circle}`}>
             2
           </span>
-          <span className="text-[18px] text-[#8A8A8A]">내용 선택하기</span>
+          <span className={`text-[18px] ${s2.label}`}>내용 선택하기</span>
         </div>
       </div>
 

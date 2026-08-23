@@ -1,13 +1,13 @@
 "use client";
 
 import { Suspense, useEffect, useRef, useState } from "react";
-import { useSearchParams } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import FirebaseNotice from "@/components/FirebaseNotice";
-import EssayQuestionBlock from "@/components/EssayQuestionBlock";
 import DocxLivePreview from "@/components/DocxLivePreview";
 import UploadProgressModal from "@/components/UploadProgressModal";
 import ParsingLoadingScreen from "@/components/ParsingLoadingScreen";
 import WizardHeader from "@/components/WizardHeader";
+import EssaySelectStep from "@/components/EssaySelectStep";
 import { isFirebaseConfigured } from "@/lib/firebase";
 import {
   addCoverLetterAnswer,
@@ -53,6 +53,7 @@ export default function ResumePreviewPage() {
 
 function ResumePreviewInner() {
   const searchParams = useSearchParams();
+  const router = useRouter();
   const [started, setStarted] = useState(false);
   const [uploadingForm, setUploadingForm] = useState(false);
   const [formName, setFormName] = useState<string | null>(null);
@@ -91,6 +92,9 @@ function ResumePreviewInner() {
   const [downloading, setDownloading] = useState(false);
   const [formDragOver, setFormDragOver] = useState(false);
   const [showLoadedToast, setShowLoadedToast] = useState(false);
+  const [step, setStep] = useState<1 | 2>(1);
+  const [expSelections, setExpSelections] = useState<Record<string, Set<string>>>({});
+  const renderRequestSeqRef = useRef(0);
   const [uploadModal, setUploadModal] = useState<{
     fileName: string;
     fileSizeBytes: number;
@@ -157,6 +161,7 @@ function ResumePreviewInner() {
     fieldsForLabels: AnalyzedField[] = fields
   ) {
     setRendering(true);
+    const requestId = ++renderRequestSeqRef.current;
     try {
       // ⚠️ fields state는 setFields 직후 같은 함수 안에서 바로 읽으면 아직 갱신 전이라
       // analyzeAndRender에서 호출할 땐 방금 분석한 목록을 fieldsForLabels로 직접 넘겨받는다.
@@ -174,11 +179,14 @@ function ResumePreviewInner() {
         }),
       });
       if (!res.ok) throw new Error((await res.json()).error ?? `미리보기 생성 실패 (${res.status})`);
-      setPreviewFile(await res.blob());
+      const blob = await res.blob();
+      // 타이핑하면서 연달아 요청이 나갈 수 있는데, 응답은 순서가 뒤바뀌어 도착할 수 있다 —
+      // 가장 마지막에 "보낸" 요청의 결과만 반영해서 오래된 응답이 최신 내용을 덮어쓰지 않게 함.
+      if (requestId === renderRequestSeqRef.current) setPreviewFile(blob);
     } catch (e) {
-      setError(String(e));
+      if (requestId === renderRequestSeqRef.current) setError(String(e));
     } finally {
-      setRendering(false);
+      if (requestId === renderRequestSeqRef.current) setRendering(false);
     }
   }
 
@@ -186,10 +194,37 @@ function ResumePreviewInner() {
     setFieldValues((prev) => ({ ...prev, [id]: value }));
   }
 
-  function refreshPreview() {
-    if (!formFileUrl) return;
-    renderPreview(formFileUrl, fieldValues);
+  function formatExperienceForField(exp: Experience): string {
+    const header = [exp.기관, exp.역할, exp.기간].filter(Boolean).join(" · ");
+    return exp.설명 ? `${header}\n${exp.설명}` : header;
   }
+
+  // 경력/경험 카드에서 "+ {필드명}" 버튼을 누르면 그 반복형 필드(예: 프로젝트 경험)에
+  // 선택한 경험들을 이어붙여 넣는다. 표의 반복 행에 하나씩 나눠 넣는 게 아니라 한 칸에
+  // 텍스트로 몰아넣는 방식 — 진짜 "행 단위로 나눠 넣기"는 아직 없음(README/QA 문서 참고).
+  function toggleExperienceForField(fieldId: string, exp: Experience) {
+    const nextSet = new Set(expSelections[fieldId] ?? []);
+    if (nextSet.has(exp.id)) nextSet.delete(exp.id);
+    else nextSet.add(exp.id);
+    setExpSelections((prev) => ({ ...prev, [fieldId]: nextSet }));
+    const joined = experiences
+      .filter((e) => nextSet.has(e.id))
+      .map(formatExperienceForField)
+      .join("\n\n");
+    updateFieldValue(fieldId, joined);
+  }
+
+  // 필드 값이 바뀔 때마다(타이핑 중 포함) 500ms 묶어서 미리보기에 자동 반영한다 — 별도
+  // "새로고침" 버튼 없이 오른쪽에서 고치면 왼쪽 미리보기가 바로바로 따라오는 느낌을 준다.
+  // ⚠️ 이 스케줄링은 setFieldValues 업데이터 함수 안이 아니라 여기 effect에서 해야 한다 —
+  // 업데이터 함수는 React가 개발 모드에서 두 번 호출할 수 있어서, 그 안에서 setTimeout 같은
+  // 부작용을 실행하면 요청이 중복으로 나가고 응답 순서가 뒤바뀌어 최신 값을 덮어쓸 수 있다.
+  useEffect(() => {
+    if (!formFileUrl || !started) return;
+    const t = setTimeout(() => renderPreview(formFileUrl, fieldValues), 500);
+    return () => clearTimeout(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [fieldValues]);
 
   async function startWithForm(url: string, name: string, overrideValues?: Record<string, string>) {
     setFormFileUrl(url);
@@ -197,6 +232,7 @@ function ResumePreviewInner() {
     setDraftId(null);
     setSavedAt(null);
     setStarted(true);
+    setStep(1);
     if (isFirebaseConfigured) {
       await analyzeAndRender(url, name, overrideValues);
     } else {
@@ -274,6 +310,13 @@ function ResumePreviewInner() {
     } catch (e) {
       setError(String(e));
     }
+  }
+
+  async function finishStep2() {
+    // "내용 선택하기"에서 수정완료를 누르면 초안을 저장하고 나의 이력서 목록으로 보낸다 —
+    // 이 화면 이후에 대한 Figma 디자인은 아직 없어서 임의로 정한 동작.
+    await handleSaveDraft();
+    router.push("/my-resumes");
   }
 
   async function handleSaveDraft() {
@@ -417,8 +460,9 @@ function ResumePreviewInner() {
     );
   }
 
-  const scalarFields = fields.filter((f) => !f.isEssay && !f.isRepeatable);
   const essayFields = fields.filter((f) => f.isEssay);
+  const repeatableFields = fields.filter((f) => f.isRepeatable && !f.isEssay);
+  const editableDocFields = fields.filter((f) => !f.isEssay);
 
   return (
     <div className="fixed inset-0 z-30 flex flex-col bg-[#F0F1F1]">
@@ -432,23 +476,15 @@ function ResumePreviewInner() {
       )}
       {analyzing && <ParsingLoadingScreen onBack={() => setStarted(false)} />}
 
-      <WizardHeader onBack={() => setStarted(false)} confirmEnabled={!analyzing && !!previewFile} />
-
-      {showLoadedToast && (
-        <div className="fixed left-1/2 top-[127px] z-20 -translate-x-1/2 rounded-xl bg-[rgba(45,113,249,0.7)] px-9 py-[18px]">
-          <p className="text-[16px] font-bold tracking-[-0.32px] text-white">
-            기본정보를 새로운 이력서에서 불러왔어요. 내용을 확인하고 잘못된 부분을 수정하세요.
-          </p>
-        </div>
-      )}
-
-      <div className="mx-auto w-full max-w-4xl flex-1 overflow-y-auto px-4 py-8">
-      {formName && (
-        <p className="mb-4 text-sm text-neutral-500">&quot;{formName}&quot; 양식 기준</p>
-      )}
+      <WizardHeader
+        activeStep={step}
+        onBack={() => (step === 2 ? setStep(1) : setStarted(false))}
+        confirmEnabled={!analyzing && !!previewFile}
+        onConfirm={step === 1 ? () => setStep(2) : finishStep2}
+      />
 
       {error && (
-        <div className="mb-4 flex items-center justify-between rounded-md border border-red-300 bg-red-50 px-4 py-2 text-sm text-red-700">
+        <div className="mx-9 mt-4 flex items-center justify-between rounded-md border border-red-300 bg-red-50 px-4 py-2 text-sm text-red-700">
           <span>{error}</span>
           {formFileUrl && formName && (
             <button
@@ -461,141 +497,135 @@ function ResumePreviewInner() {
         </div>
       )}
 
-      {fillStats && (
-        <div className="mb-4 rounded-md border border-blue-200 bg-blue-50 px-4 py-2 text-sm text-blue-800">
-          감지된 필드 {fillStats.total}개 중 <strong>{fillStats.matched}개</strong> 자동으로
-          채웠어요.
-          {fillStats.rejected > 0 && (
-            <> ({fillStats.rejected}개는 라벨이 안 맞는 것 같아 안전하게 비워뒀어요.)</>
-          )}{" "}
-          나머지는 아래에서 직접 입력해주세요.
-        </div>
-      )}
+      {step === 1 ? (
+        // 1단계: 왼쪽은 문서(값 칸을 바로 클릭해서 고침 — DocxLivePreview의 contentEditable
+        // 배선), 오른쪽은 경력/경험 목록 — "+ 필드명"을 누르면 해당 반복형 칸에 바로 채워진다.
+        <div className="flex min-h-0 flex-1 gap-6 overflow-hidden px-9 py-6">
+          <div className="flex min-w-0 flex-[3] flex-col overflow-y-auto">
+            {formName && (
+              <p className="mb-2 text-sm text-neutral-500">&quot;{formName}&quot; 양식 기준</p>
+            )}
 
-      {previewFile && (
-        <section className="mb-8">
-          <div className="mb-3 flex items-center justify-between">
-            <h2 className="font-semibold">최종 문서 미리보기</h2>
-            <div className="flex items-center gap-2">
+            {showLoadedToast && (
+              <div className="mb-4 rounded-xl bg-[rgba(45,113,249,0.7)] px-5 py-3">
+                <p className="text-sm font-bold tracking-[-0.32px] text-white">
+                  기본정보를 새로운 이력서에서 불러왔어요. 내용을 확인하고 잘못된 부분을 수정하세요.
+                </p>
+              </div>
+            )}
+            {fillStats && (
+              <div className="mb-4 rounded-md border border-blue-200 bg-blue-50 px-3 py-2 text-xs text-blue-800">
+                감지된 필드 {fillStats.total}개 중 <strong>{fillStats.matched}개</strong> 자동으로
+                채웠어요.
+                {fillStats.rejected > 0 && (
+                  <> ({fillStats.rejected}개는 라벨이 안 맞는 것 같아 비워뒀어요.)</>
+                )}
+              </div>
+            )}
+
+            <div className="mb-3 flex items-center justify-end gap-2">
               {savedAt && <span className="text-xs text-green-700">저장됨</span>}
               <button
                 onClick={handleSaveDraft}
                 disabled={saving || !isFirebaseConfigured}
-                className="rounded-md border border-neutral-300 px-3 py-1.5 text-xs text-neutral-700 hover:bg-neutral-50 disabled:opacity-40"
+                className="rounded-md border border-neutral-300 px-2.5 py-1 text-xs text-neutral-700 hover:bg-neutral-50 disabled:opacity-40"
               >
                 {saving ? "저장 중..." : "저장"}
               </button>
               <button
                 onClick={handleDownload}
                 disabled={downloading}
-                className="rounded-md bg-neutral-900 px-3 py-1.5 text-xs font-medium text-white disabled:opacity-40"
+                className="rounded-md bg-neutral-900 px-2.5 py-1 text-xs font-medium text-white disabled:opacity-40"
               >
-                {downloading ? "변환 중..." : "다운로드 (.docx)"}
+                {downloading ? "변환 중..." : "다운로드"}
               </button>
             </div>
-          </div>
-          <DocxLivePreview file={previewFile} />
-        </section>
-      )}
 
-      {scalarFields.length > 0 && (
-        <section className="mb-8">
-          <div className="mb-3 flex items-center justify-between">
-            <h2 className="font-semibold">감지된 필드 (수정하면 미리보기에 반영돼요)</h2>
-            <button
-              onClick={refreshPreview}
-              disabled={rendering}
-              className="rounded-md border border-neutral-300 px-3 py-1.5 text-xs text-neutral-700 hover:bg-neutral-50 disabled:opacity-40"
-            >
-              {rendering ? "반영 중..." : "미리보기 새로고침"}
-            </button>
-          </div>
-          <div className="grid gap-4 rounded-lg border border-neutral-200 bg-white p-4 sm:grid-cols-2">
-            {scalarFields.map((f, i) => (
-              // ⚠️ 같은 셀을 가리키는 필드가 2개 이상 나올 수 있음(예: 평균학점/총학점이 원래
-              // "0.0점 / 4.5점" 한 칸에 같이 있던 경우) — 이땐 id가 겹쳐서 같은 값을 공유하게
-              // 된다. React key 충돌만 막고, 값이 겹치는 건 알려진 제한사항으로 남겨둠
-              // (QA_수정요구사항.md 참고).
-              <label key={`${f.id}-${i}`} className="flex flex-col gap-1 text-sm">
-                <span className="font-medium text-neutral-700">{f.rawLabel}</span>
-                <input
-                  type="text"
-                  data-field-id={f.id}
-                  value={fieldValues[f.id] ?? ""}
-                  onChange={(e) => updateFieldValue(f.id, e.target.value)}
-                  onBlur={refreshPreview}
-                  className="rounded-md border border-neutral-300 px-3 py-2 focus:border-neutral-500 focus:outline-none"
-                />
-              </label>
-            ))}
-          </div>
-        </section>
-      )}
-
-      <section className="mb-8">
-        <h2 className="mb-3 font-semibold">경력/경험</h2>
-        <ul className="space-y-2">
-          {experiences.map((exp) => (
-            <li
-              key={exp.id}
-              className="rounded-lg border border-neutral-200 bg-white p-3 text-sm"
-            >
-              <span className="mr-2 rounded bg-neutral-100 px-2 py-0.5 text-xs text-neutral-600">
-                {exp.type ? TYPE_LABEL[exp.type] : "미분류"}
-              </span>
-              <span className="font-medium">{exp.기관}</span>
-              {exp.역할 && <span className="text-neutral-500"> · {exp.역할}</span>}
-              {exp.기간 && <span className="text-neutral-400"> ({exp.기간})</span>}
-              {exp.설명 && <p className="mt-1 text-neutral-700">{exp.설명}</p>}
-            </li>
-          ))}
-        </ul>
-        {fields.some((f) => f.isRepeatable) && (
-          <p className="mt-2 text-xs text-neutral-400">
-            (경력/경험을 문서의 반복 표(프로젝트 경험 등)에 자동으로 나눠 넣는 기능은 아직
-            준비 중이에요 — 지금은 위 목록으로만 확인 가능합니다.)
-          </p>
-        )}
-      </section>
-
-      {essayFields.length > 0 && (
-        <section className="mb-8 space-y-4">
-          <div className="flex items-center justify-between">
-            <h2 className="font-semibold">자기소개서 문항</h2>
-            <button
-              onClick={refreshPreview}
-              disabled={rendering}
-              className="rounded-md border border-neutral-300 px-3 py-1.5 text-xs text-neutral-700 hover:bg-neutral-50 disabled:opacity-40"
-            >
-              {rendering ? "반영 중..." : "미리보기 새로고침"}
-            </button>
-          </div>
-          {essayFields.map((f) => (
-            <EssayQuestionBlock
-              key={f.id}
-              question={f.rawLabel}
-              allAnswers={coverLetterAnswers}
-              value={fieldValues[f.id] ?? ""}
-              onChange={(v) => updateFieldValue(f.id, v)}
-            />
-          ))}
-        </section>
-      )}
-
-      {!isFirebaseConfigured && (
-        <section className="mb-8">
-          <h2 className="mb-3 font-semibold">기본 정보 (참고용)</h2>
-          <dl className="grid gap-4 rounded-lg border border-neutral-200 bg-white p-4 sm:grid-cols-2">
-            {PROFILE_FIELDS.map(({ key, label }) => (
-              <div key={key}>
-                <dt className="text-xs font-medium text-neutral-500">{label}</dt>
-                <dd className="text-sm text-neutral-900">{profile[key] || "-"}</dd>
+            {previewFile ? (
+              <DocxLivePreview
+                file={previewFile}
+                fields={editableDocFields}
+                fieldValues={fieldValues}
+                onFieldChange={updateFieldValue}
+              />
+            ) : (
+              <div className="flex flex-1 items-center justify-center text-sm text-neutral-400">
+                미리보기 준비 중...
               </div>
-            ))}
-          </dl>
-        </section>
+            )}
+
+            {!isFirebaseConfigured && (
+              <div className="mt-4">
+                <h3 className="mb-2 text-xs font-semibold text-neutral-500">기본 정보 (참고용)</h3>
+                <dl className="grid gap-3 rounded-lg border border-neutral-200 bg-white p-3 text-xs">
+                  {PROFILE_FIELDS.map(({ key, label }) => (
+                    <div key={key}>
+                      <dt className="font-medium text-neutral-500">{label}</dt>
+                      <dd className="text-neutral-900">{profile[key] || "-"}</dd>
+                    </div>
+                  ))}
+                </dl>
+              </div>
+            )}
+          </div>
+
+          <div className="flex min-w-0 flex-[2] flex-col overflow-y-auto">
+            <h3 className="mb-2 text-xs font-semibold text-neutral-500">경력/경험</h3>
+            <ul className="space-y-2">
+              {experiences.map((exp) => (
+                <li
+                  key={exp.id}
+                  className="rounded-lg border border-neutral-200 bg-white p-2.5 text-xs"
+                >
+                  <span className="mr-2 rounded bg-neutral-100 px-1.5 py-0.5 text-[10px] text-neutral-600">
+                    {exp.type ? TYPE_LABEL[exp.type] : "미분류"}
+                  </span>
+                  <span className="font-medium">{exp.기관}</span>
+                  {exp.역할 && <span className="text-neutral-500"> · {exp.역할}</span>}
+                  {exp.기간 && <span className="text-neutral-400"> ({exp.기간})</span>}
+                  {exp.설명 && <p className="mt-1 text-neutral-700">{exp.설명}</p>}
+                  {repeatableFields.length > 0 && (
+                    <div className="mt-1.5 flex flex-wrap gap-1">
+                      {repeatableFields.map((f) => {
+                        const active = expSelections[f.id]?.has(exp.id) ?? false;
+                        return (
+                          <button
+                            key={f.id}
+                            onClick={() => toggleExperienceForField(f.id, exp)}
+                            className={`rounded-full border px-2 py-0.5 text-[10px] ${
+                              active
+                                ? "border-[#2D71F9] bg-[#2D71F9] text-white"
+                                : "border-neutral-300 text-neutral-600 hover:bg-neutral-50"
+                            }`}
+                          >
+                            {active ? "✓ " : "+ "}
+                            {f.rawLabel}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  )}
+                </li>
+              ))}
+            </ul>
+          </div>
+        </div>
+      ) : (
+        // 2단계: 왼쪽은 읽기 전용 문서, 오른쪽은 자소서 문항 선택.
+        <div className="flex min-h-0 flex-1 gap-6 overflow-hidden px-9 py-6">
+          <div className="flex min-w-0 flex-[3] flex-col overflow-y-auto">
+            {previewFile && <DocxLivePreview file={previewFile} />}
+          </div>
+          <div className="flex min-w-0 flex-[2] flex-col overflow-y-auto">
+            <EssaySelectStep
+              essayFields={essayFields}
+              coverLetterAnswers={coverLetterAnswers}
+              fieldValues={fieldValues}
+              onInsert={updateFieldValue}
+            />
+          </div>
+        </div>
       )}
-      </div>
     </div>
   );
 }
