@@ -9,15 +9,7 @@ import ParsingLoadingScreen from "@/components/ParsingLoadingScreen";
 import WizardHeader from "@/components/WizardHeader";
 import EssaySelectStep from "@/components/EssaySelectStep";
 import { isFirebaseConfigured } from "@/lib/firebase";
-import {
-  addCoverLetterAnswer,
-  addExperience,
-  createResumeDraft,
-  getLatestResumeDraft,
-  getResumeDraft,
-  saveProfile,
-  updateResumeDraft,
-} from "@/lib/firestore";
+import { createResumeDraft, getResumeDraft, updateResumeDraft } from "@/lib/firestore";
 import { uploadDocumentFile } from "@/lib/storage";
 import { useAppData } from "@/lib/AppDataContext";
 import { MOCK_COVER_LETTER_ANSWERS, MOCK_EXPERIENCES, MOCK_PROFILE } from "@/lib/mockData";
@@ -85,7 +77,6 @@ function ResumePreviewInner() {
     rejected: number;
   } | null>(null);
 
-  const [existingDraft, setExistingDraft] = useState<ResumeDraft | null>(null);
   const [draftId, setDraftId] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [savedAt, setSavedAt] = useState<number | null>(null);
@@ -105,18 +96,13 @@ function ResumePreviewInner() {
   useEffect(() => {
     if (!isFirebaseConfigured) return;
     const draftIdParam = searchParams.get("draft");
-    if (draftIdParam) {
-      // 나의 이력서(/my-resumes) 목록에서 특정 초안을 골라 들어온 경우 — 그 초안을 바로 이어서 연다.
-      getResumeDraft(draftIdParam).then((draft) => {
-        if (!draft) return;
-        setDraftId(draft.id);
-        startWithForm(draft.formFileUrl, draft.formFileName, draft.fieldValues);
-      });
-      return;
-    }
-    getLatestResumeDraft()
-      .then(setExistingDraft)
-      .catch(() => {});
+    if (!draftIdParam) return;
+    // 나의 이력서(/my-resumes) 목록에서 특정 초안을 골라 들어온 경우 — 그 초안을 바로 이어서 연다.
+    getResumeDraft(draftIdParam).then((draft) => {
+      if (!draft) return;
+      setDraftId(draft.id);
+      startWithForm(draft.formFileUrl, draft.formFileName, draft.fieldValues);
+    });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -284,34 +270,6 @@ function ResumePreviewInner() {
     if (file) uploadFormFile(file);
   }
 
-  async function loadSampleForm() {
-    setError(null);
-    const absoluteUrl = `${window.location.origin}/samples/sample-form.docx`;
-    await startWithForm(absoluteUrl, "(샘플) 2026년 ICT인턴십 지원서류.docx");
-  }
-
-  async function continueDraft() {
-    if (!existingDraft) return;
-    setError(null);
-    await startWithForm(existingDraft.formFileUrl, existingDraft.formFileName, existingDraft.fieldValues);
-    setDraftId(existingDraft.id);
-  }
-
-  async function seedDummyData() {
-    if (!isFirebaseConfigured) {
-      setStarted(true);
-      return;
-    }
-    try {
-      await saveProfile(MOCK_PROFILE);
-      for (const exp of MOCK_EXPERIENCES) await addExperience(exp);
-      for (const ans of MOCK_COVER_LETTER_ANSWERS) await addCoverLetterAnswer(ans);
-      setStarted(true);
-    } catch (e) {
-      setError(String(e));
-    }
-  }
-
   async function finishStep2() {
     // "내용 선택하기"에서 수정완료를 누르면 초안을 저장하고 나의 이력서 목록으로 보낸다 —
     // 이 화면 이후에 대한 Figma 디자인은 아직 없어서 임의로 정한 동작.
@@ -399,21 +357,6 @@ function ResumePreviewInner() {
           </div>
         )}
 
-        {existingDraft && (
-          <button
-            onClick={continueDraft}
-            className="mb-4 flex w-full items-center justify-between rounded-lg border border-neutral-300 bg-neutral-50 px-4 py-3 text-left hover:bg-neutral-100"
-          >
-            <span>
-              <span className="font-medium">작성 중이던 초안이 있어요</span>
-              <span className="ml-2 text-sm text-neutral-500">
-                &quot;{existingDraft.formFileName}&quot;
-              </span>
-            </span>
-            <span className="text-sm text-neutral-600">이어서 작성하기 →</span>
-          </button>
-        )}
-
         <label
           onDragOver={(e) => {
             e.preventDefault();
@@ -440,22 +383,6 @@ function ResumePreviewInner() {
             disabled={uploadingForm}
           />
         </label>
-        {process.env.NODE_ENV === "development" && (
-          <div className="mt-4 flex justify-center gap-2">
-            <button
-              onClick={seedDummyData}
-              className="rounded-md border border-neutral-300 px-3 py-1.5 text-xs text-neutral-600 hover:bg-neutral-50"
-            >
-              🧪 더미 데이터로 바로 초안 보기 (개발용)
-            </button>
-            <button
-              onClick={loadSampleForm}
-              className="rounded-md border border-neutral-300 px-3 py-1.5 text-xs text-neutral-600 hover:bg-neutral-50"
-            >
-              🧪 실제 샘플 양식으로 미리보기 테스트 (개발용)
-            </button>
-          </div>
-        )}
       </div>
     );
   }
