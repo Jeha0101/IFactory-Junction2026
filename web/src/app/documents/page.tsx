@@ -1,11 +1,11 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useRef, useState, useMemo } from "react";
 import { isFirebaseConfigured } from "@/lib/firebase";
 import { addDocumentRecord, deleteDocumentRecord, updateDocumentRecord } from "@/lib/firestore";
 import { uploadDocumentFile } from "@/lib/storage";
 import { useAppData } from "@/lib/AppDataContext";
-import { Search, ChevronDown, FilePlus2 } from "lucide-react";
+import { Search, ChevronDown, FilePlus2, X } from "lucide-react";
 
 const EXPIRY_WARNING_DAYS = 30;
 
@@ -42,7 +42,7 @@ export default function DocumentsPage() {
           uploadedAt: new Date().toISOString(),
         });
         // onSnapshot이 목록을 알아서 갱신해준다 — 여기서 따로 refresh할 필요 없음.
-        await fetch(`/api/documents/${docId}/process`, { method: "POST" }).catch(() => {});
+        await fetch(`/api/documents/${docId}/process`, { method: "POST" }).catch(() => { });
       }
     } catch (e) {
       setError(String(e));
@@ -64,15 +64,40 @@ export default function DocumentsPage() {
 
   async function retryProcessing(id: string) {
     await updateDocumentRecord(id, { status: "processing", errorMessage: null });
-    await fetch(`/api/documents/${id}/process`, { method: "POST" }).catch(() => {});
+    await fetch(`/api/documents/${id}/process`, { method: "POST" }).catch(() => { });
   }
 
-  const filtered = search.trim()
-    ? documents.filter((d) => d.fileName.toLowerCase().includes(search.trim().toLowerCase()))
-    : documents;
-  const sorted = [...filtered].sort((a, b) =>
-    sortAsc ? a.uploadedAt.localeCompare(b.uploadedAt) : b.uploadedAt.localeCompare(a.uploadedAt)
-  );
+  // const filtered = search.trim()
+  //   ? documents.filter((d) => d.fileName.toLowerCase().includes(search.trim().toLowerCase()))
+  //   : documents;
+  // const sorted = [...filtered].sort((a, b) =>
+  //   sortAsc ? a.uploadedAt.localeCompare(b.uploadedAt) : b.uploadedAt.localeCompare(a.uploadedAt)
+  // );
+  const sorted = useMemo(() => {
+    const normalizedQuery = search.trim().toLowerCase().normalize("NFC");
+
+    const filtered = normalizedQuery
+      ? documents.filter((d) => {
+        const fileName = (d.fileName ?? "").toLowerCase().normalize("NFC");
+        const category = (d.category ?? "").toLowerCase().normalize("NFC");
+        const acquiredAt = (d.acquiredAt ?? "").toLowerCase();
+        const expiresAt = (d.expiresAt ?? "").toLowerCase();
+
+        return (
+          fileName.includes(normalizedQuery) ||
+          category.includes(normalizedQuery) ||
+          acquiredAt.includes(normalizedQuery) ||
+          expiresAt.includes(normalizedQuery)
+        );
+      })
+      : documents;
+
+    return [...filtered].sort((a, b) =>
+      sortAsc
+        ? (a.uploadedAt ?? "").localeCompare(b.uploadedAt ?? "")
+        : (b.uploadedAt ?? "").localeCompare(a.uploadedAt ?? "")
+    );
+  }, [documents, search, sortAsc]);
 
   return (
     <div>
@@ -82,7 +107,7 @@ export default function DocumentsPage() {
         </div>
       )}
 
-      <div className="mb-3 flex h-16 items-center justify-between rounded-xl bg-[#EFEFEF] px-5">
+      {/* <div className="mb-3 flex h-16 items-center justify-between rounded-xl bg-[#EFEFEF] px-5">
         <input
           value={search}
           onChange={(e) => setSearch(e.target.value)}
@@ -90,6 +115,28 @@ export default function DocumentsPage() {
           className="w-full bg-transparent text-[18px] text-[#333] placeholder:text-[#ACACAC] focus:outline-none"
         />
         <Search size={22} color="#ACACAC" />
+      </div> */}
+
+      <div className="mb-4 flex h-14 items-center justify-between rounded-2xl bg-[#F0F1F4] px-6 transition-all focus-within:ring-2 focus-within:ring-[#2563EB]/30">
+        <input
+          type="text"
+          defaultValue={search}
+          onChange={(e) => setSearch(e.target.value)}
+          onCompositionEnd={(e) => setSearch((e.target as HTMLInputElement).value)}
+          placeholder="파일 이름"
+          className="w-full bg-transparent text-[16px] text-neutral-800 placeholder:text-neutral-400 focus:outline-none"
+        />
+        {search ? (
+          <button
+            type="button"
+            onClick={() => setSearch("")}
+            className="rounded-full p-1 text-neutral-400 hover:bg-neutral-200 hover:text-neutral-600"
+          >
+            <X size={18} />
+          </button>
+        ) : (
+          <Search size={20} className="text-neutral-400" />
+        )}
       </div>
 
       <div className="mb-3 flex items-center justify-end">
@@ -193,9 +240,8 @@ export default function DocumentsPage() {
 
       {/* 우측 하단 "+" 버튼 = 자료 업로드 진입점(기존 드롭존 대체). 여러 개 선택 가능. */}
       <label
-        className={`fixed bottom-8 right-8 flex size-14 items-center justify-center rounded-full bg-[#2563EB] text-white shadow-lg transition-transform hover:scale-105 active:scale-95 ${
-          uploading || !isFirebaseConfigured ? "pointer-events-none opacity-50" : "cursor-pointer"
-        }`}
+        className={`fixed bottom-8 right-8 flex size-14 items-center justify-center rounded-full bg-[#2563EB] text-white shadow-lg transition-transform hover:scale-105 active:scale-95 ${uploading || !isFirebaseConfigured ? "pointer-events-none opacity-50" : "cursor-pointer"
+          }`}
       >
         <FilePlus2 size={24} />
         <input
