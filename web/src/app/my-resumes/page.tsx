@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from "react";
 import Link from "next/link";
-import { Search, ChevronDown, MoreHorizontal, Check } from "lucide-react";
+import { Search, ChevronDown, MoreHorizontal, Check, FilePlus2 } from "lucide-react";
 import { useAppData } from "@/lib/AppDataContext";
 import { deleteResumeDraft } from "@/lib/firestore";
 import { isFirebaseConfigured } from "@/lib/firebase";
@@ -25,8 +25,8 @@ export default function MyResumesPage() {
   const drafts = useMemo(() => {
     const filtered = search.trim()
       ? resumeDrafts.filter((d) =>
-          d.formFileName.toLowerCase().includes(search.trim().toLowerCase())
-        )
+        d.formFileName.toLowerCase().includes(search.trim().toLowerCase())
+      )
       : resumeDrafts;
     const sorted = [...filtered].sort((a, b) =>
       sortAsc ? a.updatedAt.localeCompare(b.updatedAt) : b.updatedAt.localeCompare(a.updatedAt)
@@ -41,10 +41,10 @@ export default function MyResumesPage() {
 
   return (
     <div>
-      <h1 className="mb-1 text-2xl font-bold">나의 이력서</h1>
+      {/* <h1 className="mb-1 text-2xl font-bold">나의 이력서</h1>
       <p className="mb-6 text-sm text-neutral-600">
         Resup 에이전트로 만든 이력서를 모아서 보여드려요.
-      </p>
+      </p> */}
       <FirebaseNotice />
 
       <div className="mb-3 flex h-16 items-center justify-between rounded-xl bg-[#EFEFEF] px-5">
@@ -86,8 +86,7 @@ export default function MyResumesPage() {
           {drafts.map((draft) => (
             <div
               key={draft.id}
-              className="relative flex h-[122px] items-center justify-between rounded-xl bg-white px-9"
-            >
+              className="relative flex h-[108px] items-center justify-between rounded-2xl bg-white px-8 shadow-[0_2px_8px_rgba(0,0,0,0.02)] transition-shadow hover:shadow-md"            >
               <Link href={`/resume-preview?draft=${draft.id}`} className="flex-1">
                 <p className="text-[24px] font-bold text-[#333]">{draft.formFileName}</p>
                 <p className="mt-2 flex gap-2 text-[15px] text-[#B3B3B3]">
@@ -121,6 +120,14 @@ export default function MyResumesPage() {
           ))}
         </div>
       )}
+      {/* "+" = 새 이력서 만들기 시작점 — 실제 생성 흐름은 /resume-preview에 있음
+          ("/create-resume"은 존재하지 않는 라우트였음, 2026-08-23 병합 중 발견해서 수정). */}
+      <Link
+        href="/resume-preview"
+        className="fixed bottom-8 right-8 flex size-14 items-center justify-center rounded-full bg-[#2563EB] text-white shadow-lg transition-transform hover:scale-105 active:scale-95"
+      >
+        <FilePlus2 size={24} />
+      </Link>
     </div>
   );
 }

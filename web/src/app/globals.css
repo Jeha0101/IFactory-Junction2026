@@ -3,7 +3,7 @@
    "@import 문은 @charset/@layer 외 다른 규칙보다 먼저 와야 한다" 에러가 나서 이 방식으로 우회함. */
 
 :root {
-  --background: #ffffff;
+  --background: #f8f8f8;
   --foreground: #171717;
   --font-pretendard: "Pretendard", -apple-system, BlinkMacSystemFont, sans-serif;
   /* Ria Sans는 무료로 임베드할 수 있는 배포처가 없어 Pretendard로 폴백함 — 실제 폰트 파일이 있으면

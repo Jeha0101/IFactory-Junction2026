@@ -1,6 +1,6 @@
 "use client";
 
-import { ChevronLeft, ChevronRight } from "lucide-react";
+import { ChevronLeft, Play } from "lucide-react";
 
 // Figma의 이력서 작성 2단계 위저드 헤더(node 130:6305/130:6413/130:6448 공통) — 전역
 // 탭바를 대신해서 뜬다. activeStep에 따라 1/2 원형 번호와 라벨 강조가 바뀐다.
@@ -23,7 +23,7 @@ export default function WizardHeader({
   const s2 = stepStyle(2);
 
   return (
-    <header className="flex h-[90px] shrink-0 items-center justify-between border-b border-[#EDEDED] bg-[#F8F8F8] px-9">
+    <header className="flex h-[90px] shrink-0 items-center justify-between bg-[#F8F8F8] px-9">
       <button
         onClick={onBack}
         className="flex size-[50px] items-center justify-center rounded-full text-[#333] hover:bg-neutral-100"
@@ -38,7 +38,7 @@ export default function WizardHeader({
           </span>
           <span className={`text-[18px] ${s1.label}`}>정보 확인 후 수정하기</span>
         </div>
-        <ChevronRight size={20} className="text-neutral-300" />
+        <Play size={20} className="fill-[#2D71F9] text-[#2D71F9]" />
         <div className="flex items-center gap-[17px]">
           <span className={`flex size-9 items-center justify-center rounded-full text-[18px] font-bold ${s2.circle}`}>
             2
@@ -50,9 +50,8 @@ export default function WizardHeader({
       <button
         onClick={onConfirm}
         disabled={!confirmEnabled}
-        className={`flex h-[50px] w-[142px] items-center justify-center rounded-full bg-[#2D71F9] text-[18px] font-bold text-white ${
-          confirmEnabled ? "hover:bg-[#215fdb]" : "opacity-50"
-        }`}
+        className={`flex h-[50px] w-[142px] items-center justify-center rounded-full bg-[#2D71F9] text-[18px] font-bold text-white ${confirmEnabled ? "hover:bg-[#215fdb]" : "opacity-50"
+          }`}
       >
         수정완료
       </button>

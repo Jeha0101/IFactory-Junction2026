@@ -1,11 +1,11 @@
 "use client";
 
 import { useRef, useState } from "react";
-import FirebaseNotice from "@/components/FirebaseNotice";
 import { isFirebaseConfigured } from "@/lib/firebase";
 import { addDocumentRecord, deleteDocumentRecord, updateDocumentRecord } from "@/lib/firestore";
 import { uploadDocumentFile } from "@/lib/storage";
 import { useAppData } from "@/lib/AppDataContext";
+import { Search, ChevronDown, FilePlus2 } from "lucide-react";
 
 const EXPIRY_WARNING_DAYS = 30;
 
@@ -18,8 +18,9 @@ function daysUntil(dateStr?: string | null): number | null {
 export default function DocumentsPage() {
   const { documents, loading } = useAppData();
   const [uploading, setUploading] = useState(false);
+  const [search, setSearch] = useState("");
+  const [sortAsc, setSortAsc] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [dragOver, setDragOver] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   // 여러 파일을 한 번에 올릴 수 있지만, 에이전트 처리를 동시에 여러 개 돌리면 에러가 날 수 있어
@@ -57,14 +58,6 @@ export default function DocumentsPage() {
     e.target.value = "";
   }
 
-  function handleDrop(e: React.DragEvent<HTMLLabelElement>) {
-    e.preventDefault();
-    setDragOver(false);
-    if (!isFirebaseConfigured || uploading) return;
-    const files = Array.from(e.dataTransfer.files ?? []);
-    if (files.length > 0) uploadFiles(files);
-  }
-
   async function handleDelete(id: string) {
     await deleteDocumentRecord(id);
   }
@@ -74,60 +67,57 @@ export default function DocumentsPage() {
     await fetch(`/api/documents/${id}/process`, { method: "POST" }).catch(() => {});
   }
 
+  const filtered = search.trim()
+    ? documents.filter((d) => d.fileName.toLowerCase().includes(search.trim().toLowerCase()))
+    : documents;
+  const sorted = [...filtered].sort((a, b) =>
+    sortAsc ? a.uploadedAt.localeCompare(b.uploadedAt) : b.uploadedAt.localeCompare(a.uploadedAt)
+  );
+
   return (
     <div>
-      <h1 className="mb-1 text-2xl font-bold">서류함</h1>
-      <p className="mb-6 text-sm text-neutral-600">
-        이력서, 자소서, 자격증, 어학성적, 대외활동증명서 등 뭐든 그냥 올려주세요. 종류 분류와
-        취득일·만료일은 AI가 알아서 파악합니다. (기능 3·4)
-      </p>
-      <FirebaseNotice />
       {error && (
         <div className="mb-4 rounded-md border border-red-300 bg-red-50 px-4 py-2 text-sm text-red-700">
           {error}
         </div>
       )}
 
-      <label
-        onDragOver={(e) => {
-          e.preventDefault();
-          setDragOver(true);
-        }}
-        onDragLeave={() => setDragOver(false)}
-        onDrop={handleDrop}
-        className={`mb-8 flex flex-col items-center justify-center gap-2 rounded-lg border-2 border-dashed p-8 text-center transition ${
-          dragOver ? "border-neutral-500 bg-neutral-50" : "border-neutral-300 bg-white"
-        } ${!isFirebaseConfigured ? "pointer-events-none opacity-40" : "cursor-pointer hover:border-neutral-400"}`}
-      >
-        <span className="text-2xl">＋</span>
-        <span className="font-medium">자료 추가하기</span>
-        <span className="text-xs text-neutral-500">
-          {uploading ? "업로드 중..." : "클릭하거나 파일을 끌어다 놓으세요 (여러 개 가능, 분류는 자동)"}
-        </span>
+      <div className="mb-3 flex h-16 items-center justify-between rounded-xl bg-[#EFEFEF] px-5">
         <input
-          ref={fileInputRef}
-          type="file"
-          multiple
-          className="hidden"
-          onChange={handleFileSelected}
-          disabled={uploading || !isFirebaseConfigured}
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          placeholder="파일 이름"
+          className="w-full bg-transparent text-[18px] text-[#333] placeholder:text-[#ACACAC] focus:outline-none"
         />
-      </label>
+        <Search size={22} color="#ACACAC" />
+      </div>
+
+      <div className="mb-3 flex items-center justify-end">
+        <button
+          onClick={() => setSortAsc((v) => !v)}
+          className="flex items-center gap-1 text-[16px] text-[#6E737C]"
+        >
+          {sortAsc ? "오래된순" : "최신순"}
+          <ChevronDown size={14} />
+        </button>
+      </div>
 
       {loading ? (
         <p className="text-neutral-500">불러오는 중...</p>
-      ) : documents.length === 0 ? (
-        <p className="text-neutral-500">아직 업로드한 서류가 없습니다.</p>
+      ) : sorted.length === 0 ? (
+        <p className="text-neutral-500">
+          {search ? "검색 결과가 없습니다." : "아직 업로드한 서류가 없습니다."}
+        </p>
       ) : (
         <ul className="space-y-3">
-          {documents.map((d) => {
+          {sorted.map((d) => {
             const remain = daysUntil(d.expiresAt);
             const isExpiringSoon = remain !== null && remain <= EXPIRY_WARNING_DAYS;
             const isExpired = remain !== null && remain < 0;
             return (
               <li
                 key={d.id}
-                className="flex items-center justify-between rounded-lg border border-neutral-200 bg-white p-4"
+                className="flex items-center justify-between rounded-lg bg-white p-4"
               >
                 <div>
                   <div className="flex items-center gap-2">
@@ -200,6 +190,23 @@ export default function DocumentsPage() {
           })}
         </ul>
       )}
+
+      {/* 우측 하단 "+" 버튼 = 자료 업로드 진입점(기존 드롭존 대체). 여러 개 선택 가능. */}
+      <label
+        className={`fixed bottom-8 right-8 flex size-14 items-center justify-center rounded-full bg-[#2563EB] text-white shadow-lg transition-transform hover:scale-105 active:scale-95 ${
+          uploading || !isFirebaseConfigured ? "pointer-events-none opacity-50" : "cursor-pointer"
+        }`}
+      >
+        <FilePlus2 size={24} />
+        <input
+          ref={fileInputRef}
+          type="file"
+          multiple
+          className="hidden"
+          onChange={handleFileSelected}
+          disabled={uploading || !isFirebaseConfigured}
+        />
+      </label>
     </div>
   );
 }
