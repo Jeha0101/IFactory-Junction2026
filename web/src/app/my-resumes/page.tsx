@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from "react";
 import Link from "next/link";
-import { Search, ChevronDown, MoreHorizontal, Check, FilePlus2, X } from "lucide-react";
+import { Search, ChevronDown, MoreHorizontal, FilePlus2, X } from "lucide-react";
 import { useAppData } from "@/lib/AppDataContext";
 import { deleteResumeDraft } from "@/lib/firestore";
 import { isFirebaseConfigured } from "@/lib/firebase";
@@ -92,11 +92,7 @@ export default function MyResumesPage() {
         )}
       </div>
 
-      <div className="mb-3 flex items-center justify-between">
-        {/* "생성한 이력서만 보기": 지금은 나의 이력서에 뜨는 게 전부 Resup으로 생성한 초안뿐이라
-            필터링해도 결과가 똑같음 — 나중에 "직접 업로드한 완성본"류가 추가되면 실제로 갈릴 것. */}
-        <div className="flex items-center gap-2 text-[16px] text-[#333]">
-        </div>
+      <div className="mb-3 flex items-center justify-end">
         <button
           onClick={() => setSortAsc((v) => !v)}
           className="flex items-center gap-1 text-[16px] text-[#6E737C]"
