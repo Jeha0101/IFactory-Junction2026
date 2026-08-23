@@ -31,6 +31,9 @@ export interface FillValueEntry {
   mergedGroupIndex: number;
   value: string;
   rawLabel?: string; // 있으면 mergedGroupIndex 대신 라벨 텍스트로 값 칸을 다시 찾는다 (docx_tools.py 참고)
+  // 활동사항/자격증처럼 "라벨 → 헤더 행 → 빈 데이터 행들"인 표형 반복 필드용 — 있으면
+  // 헤더 칸 텍스트(기간/구분/기관 등)로 의미를 추측해 첫 번째 빈 행에 나눠 넣는다.
+  exp?: { period?: string; org?: string; type?: string; desc?: string };
 }
 
 /** docx 파일(버퍼)의 표 구조를 추출한다 (python-docx, 결정적/정확). */

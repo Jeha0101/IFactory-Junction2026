@@ -84,6 +84,7 @@ function ResumePreviewInner() {
   const [showLoadedToast, setShowLoadedToast] = useState(false);
   const [step, setStep] = useState<1 | 2>(1);
   const [expSelections, setExpSelections] = useState<Record<string, Set<string>>>({});
+  const [expDataByField, setExpDataByField] = useState<Record<string, Experience | null>>({});
   const renderRequestSeqRef = useRef(0);
   const [uploadModal, setUploadModal] = useState<{
     fileName: string;
@@ -160,6 +161,7 @@ function ResumePreviewInner() {
             id,
             value,
             rawLabel: rawLabelById.get(id),
+            exp: expDataByField[id] ? expPayload(expDataByField[id]!) : undefined,
           })),
         }),
       });
@@ -184,19 +186,34 @@ function ResumePreviewInner() {
     return exp.설명 ? `${header}\n${exp.설명}` : header;
   }
 
-  // 경력/경험 카드에서 "+ {필드명}" 버튼을 누르면 그 반복형 필드(예: 프로젝트 경험)에
-  // 선택한 경험들을 이어붙여 넣는다. 표의 반복 행에 하나씩 나눠 넣는 게 아니라 한 칸에
-  // 텍스트로 몰아넣는 방식 — 진짜 "행 단위로 나눠 넣기"는 아직 없음(README/QA 문서 참고).
+  // 표형 반복 필드(활동사항 등)의 헤더 칸(기간/구분/기관/내용)에 정확히 대응하는 구조화된 값.
+  function expPayload(exp: Experience) {
+    return {
+      period: exp.기간,
+      org: exp.기관,
+      type: exp.type ? TYPE_LABEL[exp.type] : exp.역할,
+      desc: exp.설명 || exp.역할,
+    };
+  }
+
+  // 경력/경험 카드에서 "+ {필드명}" 버튼을 누르면 그 반복형 필드(예: 활동사항)에 선택한
+  // 경험을 넣는다. fieldValues에는 (에디터 미리보기/직접입력용) 이어붙인 텍스트를 넣고,
+  // expDataByField에는 구조화된 값을 따로 들고 있다가 render-docx로 넘긴다 — 활동사항처럼
+  // "라벨 → 헤더 행 → 빈 데이터 행들"인 표형 필드는 python 쪽에서 헤더 텍스트(기간/구분/기관
+  // 등)로 각 칸에 정확히 나눠 넣을 수 있다(docx_tools.py의 exp 처리 참고). 정확히 하나만
+  // 선택했을 때만 구조화된 값을 쓴다 — 데모 범위상 표 여러 행에 나눠 넣는 건 아직 없음.
   function toggleExperienceForField(fieldId: string, exp: Experience) {
     const nextSet = new Set(expSelections[fieldId] ?? []);
     if (nextSet.has(exp.id)) nextSet.delete(exp.id);
     else nextSet.add(exp.id);
     setExpSelections((prev) => ({ ...prev, [fieldId]: nextSet }));
-    const joined = experiences
-      .filter((e) => nextSet.has(e.id))
-      .map(formatExperienceForField)
-      .join("\n\n");
+    const selected = experiences.filter((e) => nextSet.has(e.id));
+    const joined = selected.map(formatExperienceForField).join("\n\n");
     updateFieldValue(fieldId, joined);
+    setExpDataByField((prev) => ({
+      ...prev,
+      [fieldId]: selected.length === 1 ? selected[0] : null,
+    }));
   }
 
   // 필드 값이 바뀔 때마다(타이핑 중 포함) 500ms 묶어서 미리보기에 자동 반영한다 — 별도
@@ -316,6 +333,7 @@ function ResumePreviewInner() {
             id,
             value,
             rawLabel: rawLabelById.get(id),
+            exp: expDataByField[id] ? expPayload(expDataByField[id]!) : undefined,
           })),
         }),
       });

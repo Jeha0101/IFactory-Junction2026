@@ -86,6 +86,51 @@ def _normalize_label(text: str) -> str:
     return "".join(text.lower().split()).replace("-", "")
 
 
+def _column_kind(header_text: str) -> str:
+    """반복형 표(활동사항/경력사항 등)의 헤더 칸 텍스트를 보고 Experience의 어느 필드가
+    거기 들어가야 하는지 추정한다. 사람이 채우는 표라 헤더 문구가 문서마다 제각각이라
+    (기간/일자/취득일, 기관/장소/발행처 등) 완벽하진 않지만, 데모에서 실제로 쓰는 "활동사항"
+    표(기간/활동 내용/활동구분/기관 및 장소) 기준으로는 4칸이 각각 다른 종류로 정확히 갈린다.
+    """
+    t = header_text.replace(" ", "")
+    if any(k in t for k in ("기간", "일자", "날짜", "취득")):
+        return "period"
+    if any(k in t for k in ("기관", "장소", "발행처", "소속", "회사", "단체", "학교")):
+        return "org"
+    if any(k in t for k in ("구분", "분야", "유형", "종류", "역할", "직책")):
+        return "type"
+    return "desc"
+
+
+def _find_repeatable_rows(all_rows: list[tuple[int, int, list]], rows_by_coord: dict, needle: str):
+    """라벨(예: "활동사항") 바로 다음 행을 헤더로, 그 아래 헤더와 칸 수가 같은 행들을 빈
+    데이터 행으로 본다. 표 형태 반복 필드는 에이전트가 cellRef를 못 주므로(2026-08-23
+    확인 — extract_structure의 "표 안 병합그룹만 감지" 한계와 별개로, 빈 칸이라 라벨 텍스트
+    자체가 없어서 라벨 탐색으로도 못 찾음), 이 구조적 패턴(라벨 행 → 헤더 행 → 헤더와 같은
+    폭의 빈 행들)을 하드코딩해서 위치를 잡는다. 다음 섹션(예: "어학")의 전체 폭 구분 행을
+    만나면(칸 수가 헤더와 다름) 멈춘다.
+    """
+    for ti, ri, groups in all_rows:
+        if len(groups) != 1:
+            continue
+        if _normalize_label(groups[0][1]) != needle:
+            continue
+        header = rows_by_coord.get((ti, ri + 1))
+        if not header or len(header) <= 1:
+            continue
+        blank_rows = []
+        j = ri + 2
+        while True:
+            row = rows_by_coord.get((ti, j))
+            if not row or len(row) != len(header):
+                break
+            blank_rows.append(row)
+            j += 1
+        if blank_rows:
+            return header, blank_rows
+    return None, []
+
+
 def fill_values(input_path: str, values: list[dict], output_path: str) -> None:
     """extract_structure()와 같은 좌표계(table/row/mergedGroupIndex)로 지정된 값을
     원본 docx의 정확한 셀에 써넣고 output_path로 저장한다. 원본 파일은 건드리지 않는다.
@@ -139,6 +184,7 @@ def fill_values(input_path: str, values: list[dict], output_path: str) -> None:
     for entry in values:
         ti, ri, gi = entry["table"], entry["row"], entry["mergedGroupIndex"]
         raw_label = entry.get("rawLabel")
+        exp = entry.get("exp")
         target_cell = None
         label_search_attempted = False
 
@@ -147,6 +193,21 @@ def fill_values(input_path: str, values: list[dict], output_path: str) -> None:
             if needle:
                 label_search_attempted = True
                 target_cell = find_by_label(needle, exact=True) or find_by_label(needle, exact=False)
+
+        # ⚠️ 활동사항/자격증처럼 "라벨 행 → 헤더 행 → 빈 데이터 행들" 구조인 표형 반복 필드는
+        # find_by_label로 못 찾는다(라벨 다음 행이 헤더라 칸이 여러 개라서 위에서 skip됨).
+        # 프론트(경력/경험 카드의 "+ 필드명")에서 구조화된 exp 데이터를 함께 보내주면, 헤더 텍스트
+        # (기간/활동구분/기관 등)로 각 칸의 의미를 추측해 첫 번째 빈 행에 나눠 넣는다 — 데모 범위상
+        # 여러 항목을 여러 행에 나눠 넣는 건 아직 없고 한 항목만 채운다(2026-08-23).
+        if target_cell is None and label_search_attempted and exp:
+            needle = _normalize_label(raw_label)
+            header, blank_rows = _find_repeatable_rows(all_rows, rows_by_coord, needle)
+            if header and blank_rows:
+                for (_h_cell, header_text, _h_span), (cell, _t, _s) in zip(header, blank_rows[0]):
+                    text = exp.get(_column_kind(header_text)) or exp.get("desc") or ""
+                    if text:
+                        cell.text = text
+                continue
 
         # ⚠️ rawLabel을 줬는데 문서 어디서도 못 찾았다면, 활동사항/자격증 같은 반복형(표) 필드일
         # 가능성이 높다 — 실측 확인: 에이전트 B가 "활동사항"이라는 요약 라벨을 주지만 문서엔

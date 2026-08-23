@@ -7,7 +7,12 @@ import { fillDocx, type FillValueEntry } from "@/lib/pythonDocx";
 export async function POST(req: Request) {
   const { fileUrl, values } = (await req.json()) as {
     fileUrl?: string;
-    values?: { id: string; value: string; rawLabel?: string }[];
+    values?: {
+      id: string;
+      value: string;
+      rawLabel?: string;
+      exp?: { period?: string; org?: string; type?: string; desc?: string };
+    }[];
   };
 
   if (!fileUrl) {
@@ -23,7 +28,7 @@ export async function POST(req: Request) {
       .filter((v) => v.value && v.value.trim())
       .map((v) => {
         const [table, row, mergedGroupIndex] = v.id.split("-").map(Number);
-        return { table, row, mergedGroupIndex, value: v.value, rawLabel: v.rawLabel };
+        return { table, row, mergedGroupIndex, value: v.value, rawLabel: v.rawLabel, exp: v.exp };
       });
 
     const filledBuffer = await fillDocx(buffer, fillValues);
