@@ -113,19 +113,27 @@ def fill_values(input_path: str, values: list[dict], output_path: str) -> None:
     rows_by_coord = {(ti, ri): groups for ti, ri, groups in all_rows}
 
     def find_by_label(needle: str, exact: bool):
-        for _ti, _ri, groups in all_rows:
+        for ti, ri, groups in all_rows:
             for label_idx, (_c, text, _s) in enumerate(groups):
                 norm = _normalize_label(text)
                 matched = norm == needle if exact else (needle and needle in norm)
                 if not matched:
                     continue
-                # ⚠️ 이 행에 라벨 말고 다른 칸이 없으면(표 전체 폭을 차지하는 섹션 제목 행,
-                # 예: "활동사항" colspan=7) "다음 칸"이 없다 — 그 경우 라벨 자신으로 되돌아가서
-                # 섹션 제목 자체를 덮어쓰게 된다(실측 확인, 2026-08-23). 그런 매치는 쓸 수
-                # 없으니 건너뛰고 다른 매치를 계속 찾는다.
-                if label_idx + 1 > len(groups) - 1:
-                    continue
-                return groups[label_idx + 1][0]
+                # 이 행에 라벨 말고 다른 칸이 있으면(같은 행에 라벨-값 쌍), 바로 다음 칸이 값 칸.
+                if label_idx + 1 <= len(groups) - 1:
+                    return groups[label_idx + 1][0]
+                # ⚠️ 이 행에 라벨 혼자뿐이면(표 전체 폭을 차지하는 행) 두 가지 경우가 있다:
+                # 1) "활동사항"처럼 섹션 제목 행 — 실제 값 칸은 여러 칸짜리 다음 행들(표 형태)에
+                #    있어서 우리가 자동으로 못 채운다(2026-08-23 1차 확인).
+                # 2) "성장과정"처럼 자소서 라벨 행 — 정확히 다음 한 행 전체가 그 답변 칸이다
+                #    (실측: "성장과정" 행 바로 다음 행이 그룹 1개짜리 "해당내용을 작성합니다."
+                #    행, 2026-08-23 2차 확인). 이 경우엔 다음 행이 그룹 1개뿐이라 안전하게 구분
+                #    가능 — 라벨 자신을 덮어쓸 위험 없이 값을 넣을 수 있다.
+                # 다음 행이 "그룹 1개짜리"일 때만 2번으로 보고 채운다. 그 외(다음 행이 여러
+                # 칸짜리 표 헤더 등)는 여전히 못 믿으니 건너뛰고 다른 매치를 계속 찾는다.
+                next_groups = rows_by_coord.get((ti, ri + 1))
+                if next_groups and len(next_groups) == 1:
+                    return next_groups[0][0]
         return None
 
     for entry in values:

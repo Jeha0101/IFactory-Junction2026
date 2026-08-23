@@ -79,7 +79,6 @@ function ResumePreviewInner() {
 
   const [draftId, setDraftId] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
-  const [savedAt, setSavedAt] = useState<number | null>(null);
   const [downloading, setDownloading] = useState(false);
   const [formDragOver, setFormDragOver] = useState(false);
   const [showLoadedToast, setShowLoadedToast] = useState(false);
@@ -216,7 +215,6 @@ function ResumePreviewInner() {
     setFormFileUrl(url);
     setFormName(name);
     setDraftId(null);
-    setSavedAt(null);
     setStarted(true);
     setStep(1);
     if (isFirebaseConfigured) {
@@ -271,9 +269,10 @@ function ResumePreviewInner() {
   }
 
   async function finishStep2() {
-    // "내용 선택하기"에서 수정완료를 누르면 초안을 저장하고 나의 이력서 목록으로 보낸다 —
-    // 이 화면 이후에 대한 Figma 디자인은 아직 없어서 임의로 정한 동작.
+    // 저장/다운로드는 이제 1단계가 아니라 2단계("내용 선택하기")의 수정완료 버튼에서 한 번에
+    // 처리한다 — 초안을 저장하고, 최종 docx를 다운로드하고, 나의 이력서 목록으로 보낸다.
     await handleSaveDraft();
+    await handleDownload();
     router.push("/my-resumes");
   }
 
@@ -295,7 +294,6 @@ function ResumePreviewInner() {
         });
         setDraftId(id);
       }
-      setSavedAt(Date.now());
     } catch (e) {
       setError(String(e));
     } finally {
@@ -449,24 +447,6 @@ function ResumePreviewInner() {
                 )}
               </div>
             )}
-
-            <div className="mb-3 flex items-center justify-end gap-2">
-              {savedAt && <span className="text-xs text-green-700">저장됨</span>}
-              <button
-                onClick={handleSaveDraft}
-                disabled={saving || !isFirebaseConfigured}
-                className="rounded-md border border-neutral-300 px-2.5 py-1 text-xs text-neutral-700 hover:bg-neutral-50 disabled:opacity-40"
-              >
-                {saving ? "저장 중..." : "저장"}
-              </button>
-              <button
-                onClick={handleDownload}
-                disabled={downloading}
-                className="rounded-md bg-neutral-900 px-2.5 py-1 text-xs font-medium text-white disabled:opacity-40"
-              >
-                {downloading ? "변환 중..." : "다운로드"}
-              </button>
-            </div>
 
             {previewFile ? (
               <DocxLivePreview
