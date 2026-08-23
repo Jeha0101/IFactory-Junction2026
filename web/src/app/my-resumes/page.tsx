@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from "react";
 import Link from "next/link";
-import { Search, ChevronDown, MoreHorizontal, Check, FilePlus2 } from "lucide-react";
+import { Search, ChevronDown, MoreHorizontal, Check, FilePlus2, X } from "lucide-react";
 import { useAppData } from "@/lib/AppDataContext";
 import { deleteResumeDraft } from "@/lib/firestore";
 import { isFirebaseConfigured } from "@/lib/firebase";
@@ -23,15 +23,24 @@ export default function MyResumesPage() {
   const [openMenuId, setOpenMenuId] = useState<string | null>(null);
 
   const drafts = useMemo(() => {
-    const filtered = search.trim()
-      ? resumeDrafts.filter((d) =>
-        d.formFileName.toLowerCase().includes(search.trim().toLowerCase())
-      )
+    // 1. 검색어 정규화 (공백 제거, 소문자화, 한글 자모 조합 통일)
+    const normalizedQuery = search.trim().toLowerCase().normalize("NFC");
+
+    const filtered = normalizedQuery
+      ? resumeDrafts.filter((d) => {
+        const fileName = (d.formFileName ?? "").toLowerCase().normalize("NFC");
+        const createdDate = formatDate(d.createdAt).toLowerCase();
+
+        // 파일 이름 또는 생성일자에 검색어가 포함되어 있는지 확인
+        return fileName.includes(normalizedQuery) || createdDate.includes(normalizedQuery);
+      })
       : resumeDrafts;
-    const sorted = [...filtered].sort((a, b) =>
-      sortAsc ? a.updatedAt.localeCompare(b.updatedAt) : b.updatedAt.localeCompare(a.updatedAt)
+
+    return [...filtered].sort((a, b) =>
+      sortAsc
+        ? (a.updatedAt ?? "").localeCompare(b.updatedAt ?? "")
+        : (b.updatedAt ?? "").localeCompare(a.updatedAt ?? "")
     );
-    return sorted;
   }, [resumeDrafts, search, sortAsc]);
 
   async function handleDelete(id: string) {
@@ -47,7 +56,7 @@ export default function MyResumesPage() {
       </p> */}
       <FirebaseNotice />
 
-      <div className="mb-3 flex h-16 items-center justify-between rounded-xl bg-[#EFEFEF] px-5">
+      {/* <div className="mb-3 flex h-16 items-center justify-between rounded-xl bg-[#EFEFEF] px-5">
         <input
           value={search}
           onChange={(e) => setSearch(e.target.value)}
@@ -55,16 +64,33 @@ export default function MyResumesPage() {
           className="w-full bg-transparent text-[18px] text-[#333] placeholder:text-[#ACACAC] focus:outline-none"
         />
         <Search size={22} color="#ACACAC" />
+      </div> */}
+
+      <div className="mb-4 flex h-14 items-center justify-between rounded-2xl bg-[#F0F1F4] px-6 transition-all focus-within:ring-2 focus-within:ring-[#2563EB]/30">
+        <input
+          type="text"
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          placeholder="파일 이름"
+          className="w-full bg-transparent text-[16px] text-neutral-800 placeholder:text-neutral-400 focus:outline-none"
+        />
+        {search ? (
+          <button
+            type="button"
+            onClick={() => setSearch("")}
+            className="rounded-full p-1 text-neutral-400 hover:bg-neutral-200 hover:text-neutral-600"
+          >
+            <X size={18} />
+          </button>
+        ) : (
+          <Search size={20} className="text-neutral-400" />
+        )}
       </div>
 
       <div className="mb-3 flex items-center justify-between">
         {/* "생성한 이력서만 보기": 지금은 나의 이력서에 뜨는 게 전부 Resup으로 생성한 초안뿐이라
             필터링해도 결과가 똑같음 — 나중에 "직접 업로드한 완성본"류가 추가되면 실제로 갈릴 것. */}
         <div className="flex items-center gap-2 text-[16px] text-[#333]">
-          <span className="flex size-5 items-center justify-center rounded bg-white">
-            <Check size={14} color="#2D71F9" />
-          </span>
-          생성한 이력서만 보기
         </div>
         <button
           onClick={() => setSortAsc((v) => !v)}
