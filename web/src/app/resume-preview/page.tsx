@@ -112,7 +112,7 @@ function ResumePreviewInner() {
     }
     getLatestResumeDraft()
       .then(setExistingDraft)
-      .catch(() => {});
+      .catch(() => { });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -214,8 +214,8 @@ function ResumePreviewInner() {
     try {
       const url = isFirebaseConfigured
         ? await uploadDocumentFile(file, (percent) => {
-            setUploadModal((m) => (m ? { ...m, progress: percent } : m));
-          })
+          setUploadModal((m) => (m ? { ...m, progress: percent } : m));
+        })
         : URL.createObjectURL(file);
       setUploadModal(null); // 업로드 끝 — 이후 분석 단계는 ParsingLoadingScreen(analyzing 상태)이 보여준다.
       if (uploadCancelledRef.current) return;
@@ -356,7 +356,7 @@ function ResumePreviewInner() {
           </div>
         )}
 
-        {existingDraft && (
+        {/* {existingDraft && (
           <button
             onClick={continueDraft}
             className="mb-4 flex w-full items-center justify-between rounded-lg border border-neutral-300 bg-neutral-50 px-4 py-3 text-left hover:bg-neutral-100"
@@ -369,7 +369,7 @@ function ResumePreviewInner() {
             </span>
             <span className="text-sm text-neutral-600">이어서 작성하기 →</span>
           </button>
-        )}
+        )} */}
 
         <label
           onDragOver={(e) => {
@@ -378,9 +378,8 @@ function ResumePreviewInner() {
           }}
           onDragLeave={() => setFormDragOver(false)}
           onDrop={handleFormDrop}
-          className={`flex flex-1 cursor-pointer flex-col items-center justify-center gap-[21px] rounded-xl text-center transition ${
-            formDragOver ? "bg-[#eef3fe]" : ""
-          }`}
+          className={`flex flex-1 cursor-pointer flex-col items-center justify-center gap-[21px] rounded-xl text-center transition ${formDragOver ? "bg-[#eef3fe]" : ""
+            }`}
         >
           <p className="text-[28px] font-bold text-[#404348]">새 이력서 만들기</p>
           <p className="text-[20px] text-[#6E737C]">
@@ -397,7 +396,7 @@ function ResumePreviewInner() {
             disabled={uploadingForm}
           />
         </label>
-        {process.env.NODE_ENV === "development" && (
+        {/* {process.env.NODE_ENV === "development" && (
           <div className="mt-4 flex justify-center gap-2">
             <button
               onClick={seedDummyData}
@@ -412,7 +411,7 @@ function ResumePreviewInner() {
               🧪 실제 샘플 양식으로 미리보기 테스트 (개발용)
             </button>
           </div>
-        )}
+        )} */}
       </div>
     );
   }
@@ -443,158 +442,158 @@ function ResumePreviewInner() {
       )}
 
       <div className="mx-auto w-full max-w-4xl flex-1 overflow-y-auto px-4 py-8">
-      {formName && (
-        <p className="mb-4 text-sm text-neutral-500">&quot;{formName}&quot; 양식 기준</p>
-      )}
+        {/* {formName && (
+          <p className="mb-4 text-sm text-neutral-500">&quot;{formName}&quot; 양식 기준</p>
+        )} */}
 
-      {error && (
-        <div className="mb-4 flex items-center justify-between rounded-md border border-red-300 bg-red-50 px-4 py-2 text-sm text-red-700">
-          <span>{error}</span>
-          {formFileUrl && formName && (
-            <button
-              onClick={() => analyzeAndRender(formFileUrl, formName, fieldValues)}
-              className="ml-4 shrink-0 rounded-md border border-red-300 px-3 py-1 text-xs text-red-700 hover:bg-red-100"
-            >
-              다시 시도
-            </button>
-          )}
-        </div>
-      )}
-
-      {fillStats && (
-        <div className="mb-4 rounded-md border border-blue-200 bg-blue-50 px-4 py-2 text-sm text-blue-800">
-          감지된 필드 {fillStats.total}개 중 <strong>{fillStats.matched}개</strong> 자동으로
-          채웠어요.
-          {fillStats.rejected > 0 && (
-            <> ({fillStats.rejected}개는 라벨이 안 맞는 것 같아 안전하게 비워뒀어요.)</>
-          )}{" "}
-          나머지는 아래에서 직접 입력해주세요.
-        </div>
-      )}
-
-      {previewFile && (
-        <section className="mb-8">
-          <div className="mb-3 flex items-center justify-between">
-            <h2 className="font-semibold">최종 문서 미리보기</h2>
-            <div className="flex items-center gap-2">
-              {savedAt && <span className="text-xs text-green-700">저장됨</span>}
+        {error && (
+          <div className="mb-4 flex items-center justify-between rounded-md border border-red-300 bg-red-50 px-4 py-2 text-sm text-red-700">
+            <span>{error}</span>
+            {formFileUrl && formName && (
               <button
-                onClick={handleSaveDraft}
-                disabled={saving || !isFirebaseConfigured}
+                onClick={() => analyzeAndRender(formFileUrl, formName, fieldValues)}
+                className="ml-4 shrink-0 rounded-md border border-red-300 px-3 py-1 text-xs text-red-700 hover:bg-red-100"
+              >
+                다시 시도
+              </button>
+            )}
+          </div>
+        )}
+
+        {/* {fillStats && (
+          <div className="mb-4 rounded-md border border-blue-200 bg-blue-50 px-4 py-2 text-sm text-blue-800">
+            감지된 필드 {fillStats.total}개 중 <strong>{fillStats.matched}개</strong> 자동으로
+            채웠어요.
+            {fillStats.rejected > 0 && (
+              <> ({fillStats.rejected}개는 라벨이 안 맞는 것 같아 안전하게 비워뒀어요.)</>
+            )}{" "}
+            나머지는 아래에서 직접 입력해주세요.
+          </div>
+        )} */}
+
+        {previewFile && (
+          <section className="mb-8">
+            {/* <div className="mb-3 flex items-center justify-between">
+              <h2 className="font-semibold">최종 문서 미리보기</h2>
+              <div className="flex items-center gap-2">
+                {savedAt && <span className="text-xs text-green-700">저장됨</span>}
+                <button
+                  onClick={handleSaveDraft}
+                  disabled={saving || !isFirebaseConfigured}
+                  className="rounded-md border border-neutral-300 px-3 py-1.5 text-xs text-neutral-700 hover:bg-neutral-50 disabled:opacity-40"
+                >
+                  {saving ? "저장 중..." : "저장"}
+                </button>
+                <button
+                  onClick={handleDownload}
+                  disabled={downloading}
+                  className="rounded-md bg-neutral-900 px-3 py-1.5 text-xs font-medium text-white disabled:opacity-40"
+                >
+                  {downloading ? "변환 중..." : "다운로드 (.docx)"}
+                </button>
+              </div>
+            </div> */}
+            <DocxLivePreview file={previewFile} />
+          </section>
+        )}
+
+        {scalarFields.length > 0 && (
+          <section className="mb-8">
+            <div className="mb-3 flex items-center justify-between">
+              <h2 className="font-semibold">감지된 필드 (수정하면 미리보기에 반영돼요)</h2>
+              <button
+                onClick={refreshPreview}
+                disabled={rendering}
                 className="rounded-md border border-neutral-300 px-3 py-1.5 text-xs text-neutral-700 hover:bg-neutral-50 disabled:opacity-40"
               >
-                {saving ? "저장 중..." : "저장"}
-              </button>
-              <button
-                onClick={handleDownload}
-                disabled={downloading}
-                className="rounded-md bg-neutral-900 px-3 py-1.5 text-xs font-medium text-white disabled:opacity-40"
-              >
-                {downloading ? "변환 중..." : "다운로드 (.docx)"}
+                {rendering ? "반영 중..." : "미리보기 새로고침"}
               </button>
             </div>
-          </div>
-          <DocxLivePreview file={previewFile} />
-        </section>
-      )}
-
-      {scalarFields.length > 0 && (
-        <section className="mb-8">
-          <div className="mb-3 flex items-center justify-between">
-            <h2 className="font-semibold">감지된 필드 (수정하면 미리보기에 반영돼요)</h2>
-            <button
-              onClick={refreshPreview}
-              disabled={rendering}
-              className="rounded-md border border-neutral-300 px-3 py-1.5 text-xs text-neutral-700 hover:bg-neutral-50 disabled:opacity-40"
-            >
-              {rendering ? "반영 중..." : "미리보기 새로고침"}
-            </button>
-          </div>
-          <div className="grid gap-4 rounded-lg border border-neutral-200 bg-white p-4 sm:grid-cols-2">
-            {scalarFields.map((f, i) => (
-              // ⚠️ 같은 셀을 가리키는 필드가 2개 이상 나올 수 있음(예: 평균학점/총학점이 원래
-              // "0.0점 / 4.5점" 한 칸에 같이 있던 경우) — 이땐 id가 겹쳐서 같은 값을 공유하게
-              // 된다. React key 충돌만 막고, 값이 겹치는 건 알려진 제한사항으로 남겨둠
-              // (QA_수정요구사항.md 참고).
-              <label key={`${f.id}-${i}`} className="flex flex-col gap-1 text-sm">
-                <span className="font-medium text-neutral-700">{f.rawLabel}</span>
-                <input
-                  type="text"
-                  data-field-id={f.id}
-                  value={fieldValues[f.id] ?? ""}
-                  onChange={(e) => updateFieldValue(f.id, e.target.value)}
-                  onBlur={refreshPreview}
-                  className="rounded-md border border-neutral-300 px-3 py-2 focus:border-neutral-500 focus:outline-none"
-                />
-              </label>
-            ))}
-          </div>
-        </section>
-      )}
-
-      <section className="mb-8">
-        <h2 className="mb-3 font-semibold">경력/경험</h2>
-        <ul className="space-y-2">
-          {experiences.map((exp) => (
-            <li
-              key={exp.id}
-              className="rounded-lg border border-neutral-200 bg-white p-3 text-sm"
-            >
-              <span className="mr-2 rounded bg-neutral-100 px-2 py-0.5 text-xs text-neutral-600">
-                {exp.type ? TYPE_LABEL[exp.type] : "미분류"}
-              </span>
-              <span className="font-medium">{exp.기관}</span>
-              {exp.역할 && <span className="text-neutral-500"> · {exp.역할}</span>}
-              {exp.기간 && <span className="text-neutral-400"> ({exp.기간})</span>}
-              {exp.설명 && <p className="mt-1 text-neutral-700">{exp.설명}</p>}
-            </li>
-          ))}
-        </ul>
-        {fields.some((f) => f.isRepeatable) && (
-          <p className="mt-2 text-xs text-neutral-400">
-            (경력/경험을 문서의 반복 표(프로젝트 경험 등)에 자동으로 나눠 넣는 기능은 아직
-            준비 중이에요 — 지금은 위 목록으로만 확인 가능합니다.)
-          </p>
+            <div className="grid gap-4 rounded-lg border border-neutral-200 bg-white p-4 sm:grid-cols-2">
+              {scalarFields.map((f, i) => (
+                // ⚠️ 같은 셀을 가리키는 필드가 2개 이상 나올 수 있음(예: 평균학점/총학점이 원래
+                // "0.0점 / 4.5점" 한 칸에 같이 있던 경우) — 이땐 id가 겹쳐서 같은 값을 공유하게
+                // 된다. React key 충돌만 막고, 값이 겹치는 건 알려진 제한사항으로 남겨둠
+                // (QA_수정요구사항.md 참고).
+                <label key={`${f.id}-${i}`} className="flex flex-col gap-1 text-sm">
+                  <span className="font-medium text-neutral-700">{f.rawLabel}</span>
+                  <input
+                    type="text"
+                    data-field-id={f.id}
+                    value={fieldValues[f.id] ?? ""}
+                    onChange={(e) => updateFieldValue(f.id, e.target.value)}
+                    onBlur={refreshPreview}
+                    className="rounded-md border border-neutral-300 px-3 py-2 focus:border-neutral-500 focus:outline-none"
+                  />
+                </label>
+              ))}
+            </div>
+          </section>
         )}
-      </section>
 
-      {essayFields.length > 0 && (
-        <section className="mb-8 space-y-4">
-          <div className="flex items-center justify-between">
-            <h2 className="font-semibold">자기소개서 문항</h2>
-            <button
-              onClick={refreshPreview}
-              disabled={rendering}
-              className="rounded-md border border-neutral-300 px-3 py-1.5 text-xs text-neutral-700 hover:bg-neutral-50 disabled:opacity-40"
-            >
-              {rendering ? "반영 중..." : "미리보기 새로고침"}
-            </button>
-          </div>
-          {essayFields.map((f) => (
-            <EssayQuestionBlock
-              key={f.id}
-              question={f.rawLabel}
-              allAnswers={coverLetterAnswers}
-              value={fieldValues[f.id] ?? ""}
-              onChange={(v) => updateFieldValue(f.id, v)}
-            />
-          ))}
-        </section>
-      )}
-
-      {!isFirebaseConfigured && (
         <section className="mb-8">
-          <h2 className="mb-3 font-semibold">기본 정보 (참고용)</h2>
-          <dl className="grid gap-4 rounded-lg border border-neutral-200 bg-white p-4 sm:grid-cols-2">
-            {PROFILE_FIELDS.map(({ key, label }) => (
-              <div key={key}>
-                <dt className="text-xs font-medium text-neutral-500">{label}</dt>
-                <dd className="text-sm text-neutral-900">{profile[key] || "-"}</dd>
-              </div>
+          <h2 className="mb-3 font-semibold">경력/경험</h2>
+          <ul className="space-y-2">
+            {experiences.map((exp) => (
+              <li
+                key={exp.id}
+                className="rounded-lg border border-neutral-200 bg-white p-3 text-sm"
+              >
+                <span className="mr-2 rounded bg-neutral-100 px-2 py-0.5 text-xs text-neutral-600">
+                  {exp.type ? TYPE_LABEL[exp.type] : "미분류"}
+                </span>
+                <span className="font-medium">{exp.기관}</span>
+                {exp.역할 && <span className="text-neutral-500"> · {exp.역할}</span>}
+                {exp.기간 && <span className="text-neutral-400"> ({exp.기간})</span>}
+                {exp.설명 && <p className="mt-1 text-neutral-700">{exp.설명}</p>}
+              </li>
             ))}
-          </dl>
+          </ul>
+          {fields.some((f) => f.isRepeatable) && (
+            <p className="mt-2 text-xs text-neutral-400">
+              (경력/경험을 문서의 반복 표(프로젝트 경험 등)에 자동으로 나눠 넣는 기능은 아직
+              준비 중이에요 — 지금은 위 목록으로만 확인 가능합니다.)
+            </p>
+          )}
         </section>
-      )}
+
+        {essayFields.length > 0 && (
+          <section className="mb-8 space-y-4">
+            <div className="flex items-center justify-between">
+              <h2 className="font-semibold">자기소개서 문항</h2>
+              <button
+                onClick={refreshPreview}
+                disabled={rendering}
+                className="rounded-md border border-neutral-300 px-3 py-1.5 text-xs text-neutral-700 hover:bg-neutral-50 disabled:opacity-40"
+              >
+                {rendering ? "반영 중..." : "미리보기 새로고침"}
+              </button>
+            </div>
+            {essayFields.map((f) => (
+              <EssayQuestionBlock
+                key={f.id}
+                question={f.rawLabel}
+                allAnswers={coverLetterAnswers}
+                value={fieldValues[f.id] ?? ""}
+                onChange={(v) => updateFieldValue(f.id, v)}
+              />
+            ))}
+          </section>
+        )}
+
+        {!isFirebaseConfigured && (
+          <section className="mb-8">
+            <h2 className="mb-3 font-semibold">기본 정보 (참고용)</h2>
+            <dl className="grid gap-4 rounded-lg border border-neutral-200 bg-white p-4 sm:grid-cols-2">
+              {PROFILE_FIELDS.map(({ key, label }) => (
+                <div key={key}>
+                  <dt className="text-xs font-medium text-neutral-500">{label}</dt>
+                  <dd className="text-sm text-neutral-900">{profile[key] || "-"}</dd>
+                </div>
+              ))}
+            </dl>
+          </section>
+        )}
       </div>
     </div>
   );

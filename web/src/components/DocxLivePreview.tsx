@@ -40,10 +40,10 @@ export default function DocxLivePreview({ file }: Props) {
 
   return (
     <div className="rounded-lg border border-neutral-200 bg-white">
-      <div className="flex items-center justify-between border-b border-neutral-200 px-4 py-2 text-xs text-neutral-500">
+      {/* <div className="flex items-center justify-between border-b border-neutral-200 px-4 py-2 text-xs text-neutral-500">
         <span>최종 문서 미리보기 (읽기 전용) — 값 수정은 아래 편집 항목에서 해주세요</span>
         {loading && <span>렌더링 중...</span>}
-      </div>
+      </div> */}
       {error && <p className="p-4 text-sm text-red-600">{error}</p>}
       <div ref={containerRef} className="docx-live-preview max-h-[70vh] overflow-auto p-4" />
     </div>
